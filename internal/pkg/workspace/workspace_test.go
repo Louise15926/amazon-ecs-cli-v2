@@ -14,6 +14,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// mockBinaryMarshaler implements the encoding.BinaryMarshaler interface.
+type mockBinaryMarshaler struct {
+	content []byte
+	err     error
+}
+
+func (m mockBinaryMarshaler) MarshalBinary() (data []byte, err error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.content, nil
+}
+
 func TestWorkspace_copilotDirPath(t *testing.T) {
 	// turn "test/copilot" into a platform-dependent path
 	var manifestDir = filepath.FromSlash("test/copilot")
@@ -228,23 +241,6 @@ func TestWorkspace_Create(t *testing.T) {
 	}
 }
 
-func TestWorkspace_DeleteAll(t *testing.T) {
-	t.Run("should delete the folder", func(t *testing.T) {
-		fs := afero.NewMemMapFs()
-		err := fs.Mkdir(CopilotDirName, 0755)
-		require.NoError(t, err)
-		ws := Workspace{
-			fsUtils: &afero.Afero{
-				Fs: fs,
-			},
-		}
-
-		got := ws.DeleteAll()
-
-		require.NoError(t, got)
-	})
-}
-
 func TestWorkspace_ServiceNames(t *testing.T) {
 	testCases := map[string]struct {
 		copilotDir string
@@ -395,131 +391,6 @@ func TestWorkspace_write(t *testing.T) {
 	}
 }
 
-func TestWorkspace_DeleteService(t *testing.T) {
-	testCases := map[string]struct {
-		name string
-
-		copilotDir string
-		fs         func() afero.Fs
-	}{
-		"deletes existing service": {
-			name: "webhook",
-
-			copilotDir: "/copilot",
-			fs: func() afero.Fs {
-				fs := afero.NewMemMapFs()
-				fs.MkdirAll("/copilot/webhook", 0755)
-				manifest, _ := fs.Create("/copilot/webhook/manifest.yml")
-				defer manifest.Close()
-				manifest.Write([]byte("hello"))
-				return fs
-			},
-		},
-		"deletes an non-existing service": {
-			name: "webhook",
-
-			copilotDir: "/copilot",
-			fs: func() afero.Fs {
-				fs := afero.NewMemMapFs()
-				fs.MkdirAll("/copilot", 0755)
-				return fs
-			},
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			// GIVEN
-			fs := tc.fs()
-			ws := &Workspace{
-				copilotDir: tc.copilotDir,
-				fsUtils: &afero.Afero{
-					Fs: fs,
-				},
-			}
-
-			// WHEN
-			err := ws.DeleteService(tc.name)
-
-			// THEN
-			require.NoError(t, err)
-
-			// There should be no more directory under the copilot/ directory.
-			path := filepath.Join(tc.copilotDir, tc.name)
-			_, existErr := fs.Stat(path)
-			expectedErr := &os.PathError{
-				Op:   "open",
-				Path: path,
-				Err:  os.ErrNotExist,
-			}
-			require.EqualError(t, existErr, expectedErr.Error())
-		})
-	}
-}
-
-func TestWorkspace_DeletePipelineManifest(t *testing.T) {
-	copilotDir := "/copilot"
-	testCases := map[string]struct {
-		fs            func() afero.Fs
-		expectedError error
-	}{
-		"deletes existing pipeline manifest": {
-			fs: func() afero.Fs {
-				fs := afero.NewMemMapFs()
-				fs.Mkdir(copilotDir, 0755)
-				manifest, _ := fs.Create("/copilot/pipeline.yml")
-				defer manifest.Close()
-				manifest.Write([]byte("hello"))
-				return fs
-			},
-			expectedError: nil,
-		},
-		"when no pipeline file exists": {
-			fs: func() afero.Fs {
-				fs := afero.NewMemMapFs()
-				fs.Mkdir(copilotDir, 0755)
-				return fs
-			},
-			expectedError: &os.PathError{
-				Op:   "remove",
-				Path: filepath.Join(copilotDir, "pipeline.yml"),
-				Err:  os.ErrNotExist,
-			},
-		},
-	}
-
-	for name, tc := range testCases {
-		t.Run(name, func(t *testing.T) {
-			// GIVEN
-			fs := tc.fs()
-			ws := &Workspace{
-				copilotDir: copilotDir,
-				fsUtils:    &afero.Afero{Fs: fs},
-			}
-
-			// WHEN
-			err := ws.DeletePipelineManifest()
-
-			// THEN
-			if tc.expectedError != nil {
-				require.EqualError(t, err, tc.expectedError.Error())
-			}
-
-			// There should be no pipeline manifest in the copilot directory.
-			if err == nil {
-				path := filepath.Join(copilotDir, "pipeline.yml")
-				_, existErr := fs.Stat(path)
-				expectedErr := &os.PathError{
-					Op:   "open",
-					Path: path,
-					Err:  os.ErrNotExist,
-				}
-				require.EqualError(t, existErr, expectedErr.Error())
-			}
-		})
-	}
-}
-
 func TestWorkspace_ReadAddonsDir(t *testing.T) {
 	testCases := map[string]struct {
 		svcName        string
@@ -579,6 +450,65 @@ func TestWorkspace_ReadAddonsDir(t *testing.T) {
 	}
 }
 
+func TestWorkspace_WriteAddon(t *testing.T) {
+	testCases := map[string]struct {
+		marshaler   mockBinaryMarshaler
+		svc         string
+		storageName string
+
+		wantedPath string
+		wantedErr  error
+	}{
+		"writes addons file with content": {
+			marshaler: mockBinaryMarshaler{
+				content: []byte("hello"),
+			},
+			svc:         "webhook",
+			storageName: "s3",
+
+			wantedPath: "/copilot/webhook/addons/s3.yml",
+		},
+		"wraps error if cannot marshal to binary": {
+			marshaler: mockBinaryMarshaler{
+				err: errors.New("some error"),
+			},
+			svc:         "webhook",
+			storageName: "s3",
+
+			wantedErr: errors.New("marshal binary addon content: some error"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			// GIVEN
+			fs := afero.NewMemMapFs()
+			utils := &afero.Afero{
+				Fs: fs,
+			}
+			utils.MkdirAll(filepath.Join("/", "copilot", tc.svc), 0755)
+			ws := &Workspace{
+				workingDir: "/",
+				copilotDir: "/copilot",
+				fsUtils:    utils,
+			}
+
+			// WHEN
+			actualPath, actualErr := ws.WriteAddon(tc.marshaler, tc.svc, tc.storageName)
+
+			// THEN
+			if tc.wantedErr != nil {
+				require.EqualError(t, actualErr, tc.wantedErr.Error(), "expected the same error")
+			} else {
+				require.Equal(t, tc.wantedPath, actualPath, "expected the same path")
+				out, err := utils.ReadFile(tc.wantedPath)
+				require.NoError(t, err)
+				require.Equal(t, tc.marshaler.content, out, "expected the contents of the file to match")
+			}
+		})
+	}
+}
+
 func TestWorkspace_ReadPipelineManifest(t *testing.T) {
 	copilotDir := "/copilot"
 	testCases := map[string]struct {
@@ -625,6 +555,55 @@ func TestWorkspace_ReadPipelineManifest(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestWorkspace_DeleteWorkspaceFile(t *testing.T) {
+	testCases := map[string]struct {
+		copilotDir string
+		fs         func() afero.Fs
+	}{
+		".workspace should be deleted": {
+			copilotDir: "copilot",
+			fs: func() afero.Fs {
+				fs := afero.NewMemMapFs()
+				fs.MkdirAll("/copilot", 0755)
+				fs.Create("/copilot/.workspace")
+				return fs
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+
+			// GIVEN
+			fs := tc.fs()
+			ws := &Workspace{
+				copilotDir: tc.copilotDir,
+				fsUtils: &afero.Afero{
+					Fs: fs,
+				},
+			}
+			ws.fsUtils.MkdirAll("copilot", 0755)
+			ws.fsUtils.Create(tc.copilotDir + "/" + ".workspace")
+
+			// WHEN
+			err := ws.DeleteWorkspaceFile()
+
+			// THEN
+			require.NoError(t, err)
+
+			// There should be no more .workspace file under the copilot/ directory.
+			path := filepath.Join(tc.copilotDir, "/.workspace")
+			_, existErr := fs.Stat(path)
+			expectedErr := &os.PathError{
+				Op:   "open",
+				Path: path,
+				Err:  os.ErrNotExist,
+			}
+			require.EqualError(t, existErr, expectedErr.Error())
 		})
 	}
 }

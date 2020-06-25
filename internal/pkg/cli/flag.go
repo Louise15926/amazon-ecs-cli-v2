@@ -5,10 +5,10 @@ package cli
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/manifest"
+	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/template"
 )
 
 // Long flag names.
@@ -46,7 +46,23 @@ const (
 	deleteSecretFlag      = "delete-secret"
 	svcPortFlag           = "port"
 
-	storageTypeFlag = "storage-type"
+	storageTypeFlag         = "storage-type"
+	storagePartitionKeyFlag = "partition-key"
+	storageSortKeyFlag      = "sort-key"
+	storageNoSortFlag       = "no-sort"
+	storageLSIConfigFlag    = "lsi"
+	storageNoLSIFlag        = "no-lsi"
+
+	taskGroupNameFlag  = "task-group-name"
+	countFlag          = "count"
+	cpuFlag            = "cpu"
+	memoryFlag         = "memory"
+	imageFlag          = "image"
+	taskRoleFlag       = "task-role"
+	subnetFlag         = "subnet"
+	securityGroupsFlag = "security-groups"
+	envVarsFlag        = "env-vars"
+	commandsFlag       = "commands"
 )
 
 // Short flag names.
@@ -68,9 +84,9 @@ const (
 // Descriptions for flags.
 var (
 	svcTypeFlagDescription = fmt.Sprintf(`Type of service to create. Must be one of:
-%s`, strings.Join(quoteAll(manifest.ServiceTypes), ", "))
+%s`, strings.Join(template.QuoteSliceFunc(manifest.ServiceTypes), ", "))
 	storageTypeFlagDescription = fmt.Sprintf(`Type of storage to add. Must be one of:
-%s`, strings.Join(quoteAll(storageTypes), ", "))
+%s`, strings.Join(template.QuoteSliceFunc(storageTypes), ", "))
 )
 
 const (
@@ -110,14 +126,25 @@ Defaults to all logs. Only one of end-time / follow may be used.`
 	deleteSecretFlagDescription      = "Deletes AWS Secrets Manager secret associated with a pipeline source repository."
 	svcPortFlagDescription           = "Optional. The port on which your service listens."
 
-	storageFlagDescription        = "Name of the storage resource to create."
-	storageServiceFlagDescription = "Name of the service to associate with storage."
-)
+	storageFlagDescription             = "Name of the storage resource to create."
+	storageServiceFlagDescription      = "Name of the service to associate with storage."
+	storagePartitionKeyFlagDescription = `Partition key for the DDB table.
+Must be of the format '<keyName>:<dataType>'.`
+	storageSortKeyFlagDescription = `Optional. Sort key for the DDB table.
+Must be of the format '<keyName>:<dataType>'.`
+	storageNoSortFlagDescription    = "Optional. Skip configuring sort keys."
+	storageNoLsiFlagDescription     = `Optional. Don't ask about configuring alternate sort keys.`
+	storageLSIConfigFlagDescription = `Optional. Attribute to use as an alternate sort key. May be specified up to 5 times.
+Must be of the format '<keyName>:<dataType>'.`
 
-func quoteAll(elems []string) []string {
-	quotedElems := make([]string, len(elems))
-	for i, el := range elems {
-		quotedElems[i] = strconv.Quote(el)
-	}
-	return quotedElems
-}
+	countFlagDescription          = "Optional. The number of tasks to set up. Default 1."
+	cpuFlagDescription            = "Optional. The number of CPU units to reserve for each task. Default 256 (1/4 vCPU)."
+	memoryFlagDescription         = "Optional. The amount of memory to reserve in MiB for each task. Default 512."
+	imageFlagDescription          = "Optional. The image to run instead of building a Dockerfile."
+	taskRoleFlagDescription       = "Optional. The role for the task to use."
+	subnetFlagDescription         = "Optional. The subnet id for the task to use."
+	securityGroupsFlagDescription = "Optional. The security group id(s) for the task to use. Can be specified multiple times."
+	envVarsFlagDescription        = "Optional. Environment variables specified by key=value separated with commas."
+	commandsFlagDescription       = "Optional. List of commands that are passed to docker run. Can be specified multiple times."
+	taskGroupFlagDescription      = "The group name of the task. Tasks with the same group name share the same set of resources."
+)

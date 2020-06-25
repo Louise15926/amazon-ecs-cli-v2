@@ -3,15 +3,15 @@
 package dockerfile
 
 import (
-	"bufio"
-	"strings"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseDockerfile(t *testing.T) {
+func TestParseExposeDockerfile(t *testing.T) {
 	testCases := map[string]struct {
 		dockerfile   string
 		err          error
@@ -28,6 +28,7 @@ func TestParseDockerfile(t *testing.T) {
 						RawString: "5000",
 					},
 				},
+				HealthCheck: nil,
 			},
 		},
 		"correctly parses exposed port and protocol": {
@@ -41,6 +42,7 @@ func TestParseDockerfile(t *testing.T) {
 						RawString: "5000/tcp",
 					},
 				},
+				HealthCheck: nil,
 			},
 		},
 		"multiple ports with one expose line": {
@@ -64,19 +66,17 @@ func TestParseDockerfile(t *testing.T) {
 						RawString: "6000",
 					},
 				},
+				HealthCheck: nil,
 			},
 		},
 	}
 
 	for name, tc := range testCases {
 		t.Run(name, func(t *testing.T) {
-			r := strings.NewReader(tc.dockerfile)
-			scanner := bufio.NewScanner(r)
-			got := parseFromScanner(scanner)
-			require.Equal(t, tc.wantedConfig, got)
+			got, _ := parse(tc.dockerfile)
+			require.Equal(t, tc.wantedConfig, *got)
 		})
 	}
-
 }
 
 func getUintPorts(inPorts []portConfig) []uint16 {
@@ -92,7 +92,7 @@ func getUintPorts(inPorts []portConfig) []uint16 {
 	return ports
 }
 
-func TestDockerfileInterface(t *testing.T) {
+func TestDockerfile_GetExposedPort(t *testing.T) {
 	wantedPath := "./Dockerfile"
 	testCases := map[string]struct {
 		dockerfilePath string
@@ -193,6 +193,69 @@ EXPOSE 8080/tcp 5000`),
 
 			require.Equal(t, wantedUintPorts, ports)
 
+		})
+	}
+}
+
+func TestDockerfile_GetHealthCheck(t *testing.T) {
+	testCases := map[string]struct {
+		dockerfilePath string
+		dockerfile     []byte
+		wantedConfig   *HealthCheck
+		wantedErr      error
+	}{
+		"correctly parses healthcheck with default values": {
+			dockerfile: []byte(`HEALTHCHECK CMD curl -f http://localhost/ || exit 1`),
+			wantedErr:  nil,
+			wantedConfig: &HealthCheck{
+				Interval:    10 * time.Second,
+				Timeout:     5 * time.Second,
+				StartPeriod: 0,
+				Retries:     2,
+				Cmd:         []string{"CMD curl -f http://localhost/ || exit 1"},
+			},
+		},
+		"correctly parses healthcheck with user's values": {
+			dockerfile: []byte(`HEALTHCHECK --interval=5m --timeout=3s --start-period=2s --retries=3 \
+			CMD curl -f http://localhost/ || exit 1`),
+			wantedErr: nil,
+			wantedConfig: &HealthCheck{
+				Interval:    300 * time.Second,
+				Timeout:     3 * time.Second,
+				StartPeriod: 2 * time.Second,
+				Retries:     3,
+				Cmd:         []string{"CMD curl -f http://localhost/ || exit 1"},
+			},
+		},
+		"correctly parses healthcheck with NONE": {
+			dockerfile:   []byte(`HEALTHCHECK NONE`),
+			wantedErr:    nil,
+			wantedConfig: nil,
+		},
+		"healthcheck contains an invalid flag": {
+			dockerfile: []byte(`HEALTHCHECK --interval=5m --randomFlag=4s CMD curl -f http://localhost/ || exit 1`),
+			wantedErr:  fmt.Errorf("parse instructions: Unknown flag: randomFlag"),
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			fs := afero.Afero{Fs: afero.NewMemMapFs()}
+			err := fs.WriteFile("./Dockerfile", tc.dockerfile, 0644)
+			if err != nil {
+				t.FailNow()
+			}
+
+			df := New(fs, "./Dockerfile")
+			hc, err := df.GetHealthCheck()
+
+			if tc.wantedErr != nil {
+				require.EqualError(t, err, tc.wantedErr.Error())
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, tc.wantedConfig, hc)
 		})
 	}
 }

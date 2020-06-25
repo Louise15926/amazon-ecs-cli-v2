@@ -15,6 +15,7 @@ import (
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/deploy"
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/deploy/cloudformation/stack"
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/describe"
+	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/docker/dockerfile"
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/command"
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/workspace"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -182,8 +183,8 @@ type describer interface {
 	Describe() (describe.HumanJSONStringer, error)
 }
 
-type workspaceDeleter interface {
-	DeleteAll() error
+type wsFileDeleter interface {
+	DeleteWorkspaceFile() error
 }
 
 type svcManifestReader interface {
@@ -203,10 +204,6 @@ type wsPipelineWriter interface {
 	WritePipelineManifest(marshaler encoding.BinaryMarshaler) (string, error)
 }
 
-type wsSvcDeleter interface {
-	DeleteService(name string) error
-}
-
 type wsServiceLister interface {
 	ServiceNames() ([]string, error)
 }
@@ -214,11 +211,6 @@ type wsServiceLister interface {
 type wsSvcReader interface {
 	wsServiceLister
 	svcManifestReader
-}
-
-type wsPipelineDeleter interface {
-	DeletePipelineManifest() error
-	wsPipelineManifestReader
 }
 
 type wsPipelineReader interface {
@@ -229,6 +221,11 @@ type wsPipelineReader interface {
 type wsAppManager interface {
 	Create(appName string) error
 	Summary() (*workspace.Summary, error)
+}
+
+type wsAddonManager interface {
+	WriteAddon(f encoding.BinaryMarshaler, svc, name string) (string, error)
+	wsSvcReader
 }
 
 type artifactUploader interface {
@@ -294,6 +291,7 @@ type domainValidator interface {
 
 type dockerfileParser interface {
 	GetExposedPorts() ([]uint16, error)
+	GetHealthCheck() (*dockerfile.HealthCheck, error)
 }
 
 type serviceArnGetter interface {
@@ -337,6 +335,11 @@ type appSelector interface {
 type appEnvSelector interface {
 	appSelector
 	Environment(prompt, help, app string) (string, error)
+}
+
+type appEnvWithNoneSelector interface {
+	appSelector
+	EnvironmentWithNone(prompt, help, app string) (string, error)
 }
 
 type configSelector interface {

@@ -4,9 +4,6 @@
 package manifest
 
 import (
-	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/template"
@@ -40,8 +37,16 @@ type BackendService struct {
 type BackendServiceConfig struct {
 	Image      imageWithPortAndHealthcheck `yaml:",flow"`
 	TaskConfig `yaml:",inline"`
-	LogConfig  `yaml:"logging,flow"`
+	*LogConfig `yaml:"logging,flow"`
 	Sidecar    `yaml:",inline"`
+}
+
+// LogConfigOpts converts the service's Firelens configuration into a format parsable by the templates pkg.
+func (bc *BackendServiceConfig) LogConfigOpts() *template.LogConfigOpts {
+	if bc.LogConfig == nil {
+		return nil
+	}
+	return bc.logConfigOpts()
 }
 
 type imageWithPortAndHealthcheck struct {
@@ -82,16 +87,8 @@ func NewBackendService(props BackendServiceProps) *BackendService {
 // Implements the encoding.BinaryMarshaler interface.
 func (s *BackendService) MarshalBinary() ([]byte, error) {
 	content, err := s.parser.Parse(backendSvcManifestPath, *s, template.WithFuncs(map[string]interface{}{
-		"fmtSlice": func(elems []string) string {
-			return fmt.Sprintf("[%s]", strings.Join(elems, ", "))
-		},
-		"quoteSlice": func(elems []string) []string {
-			quotedElems := make([]string, len(elems))
-			for i, el := range elems {
-				quotedElems[i] = strconv.Quote(el)
-			}
-			return quotedElems
-		},
+		"fmtSlice":   template.FmtSliceFunc,
+		"quoteSlice": template.QuoteSliceFunc,
 	}))
 	if err != nil {
 		return nil, err

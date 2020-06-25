@@ -6,10 +6,7 @@ package template
 import (
 	"bytes"
 	"fmt"
-	"strconv"
-	"strings"
 	"text/template"
-	"unicode"
 
 	"github.com/aws/aws-sdk-go/service/ecs"
 )
@@ -38,6 +35,16 @@ type SidecarOpts struct {
 	CredsParam *string
 }
 
+// LogConfigOpts holds configuration that's needed if the service is configured with Firelens to route
+// its logs.
+type LogConfigOpts struct {
+	Image          *string
+	Destination    map[string]string
+	EnableMetadata *string
+	SecretOptions  map[string]string
+	ConfigFile     *string
+}
+
 // ServiceOpts holds optional data that can be provided to enable features in a service stack template.
 type ServiceOpts struct {
 	// Additional options that're common between **all** service templates.
@@ -45,6 +52,7 @@ type ServiceOpts struct {
 	Secrets     map[string]string
 	NestedStack *ServiceNestedStackOpts // Outputs from nested stacks such as the addons stack.
 	Sidecars    []*SidecarOpts
+	LogConfig   *LogConfigOpts
 
 	// Additional options that're not shared across all service templates.
 	HealthCheck        *ecs.HealthCheck
@@ -88,25 +96,12 @@ func (t *Template) parseSvc(name string, data interface{}, options ...ParseOptio
 func withSvcParsingFuncs() ParseOption {
 	return func(t *template.Template) *template.Template {
 		return t.Funcs(map[string]interface{}{
-			"toSnakeCase":    toSnakeCase,
-			"hasSecrets":     hasSecrets,
-			"stringifySlice": stringifySlice,
-			"quoteAll":       quoteAll,
+			"toSnakeCase": ToSnakeCaseFunc,
+			"hasSecrets":  hasSecrets,
+			"fmtSlice":    FmtSliceFunc,
+			"quoteSlice":  QuotePSliceFunc,
 		})
 	}
-}
-
-// toSnakeCase transforms a CamelCase input string s into an upper SNAKE_CASE string and returns it.
-// For example, "usersDdbTableName" becomes "USERS_DDB_TABLE_NAME".
-func toSnakeCase(s string) string {
-	var name string
-	for i, r := range s {
-		if unicode.IsUpper(r) && i != 0 {
-			name += "_"
-		}
-		name += string(unicode.ToUpper(r))
-	}
-	return name
 }
 
 func hasSecrets(opts ServiceOpts) bool {
@@ -117,20 +112,4 @@ func hasSecrets(opts ServiceOpts) bool {
 		return true
 	}
 	return false
-}
-
-func stringifySlice(elems []string) string {
-	return fmt.Sprintf("[%s]", strings.Join(elems, ", "))
-}
-
-func quoteAll(elems []*string) []string {
-	if elems == nil {
-		return nil
-	}
-
-	quotedElems := make([]string, len(elems))
-	for i, el := range elems {
-		quotedElems[i] = strconv.Quote(*el)
-	}
-	return quotedElems
 }

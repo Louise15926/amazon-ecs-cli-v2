@@ -148,6 +148,10 @@ func TestValidateS3Name(t *testing.T) {
 			input: "124.333.333.333.333",
 			want:  nil,
 		},
+		"capital letters in bucket name": {
+			input: "BADbucketname",
+			want:  errValueBadFormatWithPeriod,
+		},
 	}
 
 	for name, tc := range testCases {
@@ -215,7 +219,92 @@ func TestValidateStorageType(t *testing.T) {
 			}
 		})
 	}
+}
 
+func TestValidateKey(t *testing.T) {
+	testCases := map[string]struct {
+		input string
+		want  error
+	}{
+		"good key": {
+			input: "userID:S",
+			want:  nil,
+		},
+		"bad key with space": {
+			input: "user ID:S",
+			want:  errDDBAttributeBadFormat,
+		},
+		"nonsense key": {
+			input: "sfueir555'/",
+			want:  errDDBAttributeBadFormat,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			got := validateKey(tc.input)
+
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestGetAttributeFromKey(t *testing.T) {
+	testCases := map[string]struct {
+		input     string
+		wantName  string
+		wantType  string
+		wantError error
+	}{
+		"good case": {
+			input:     "userID:S",
+			wantName:  "userID",
+			wantType:  "S",
+			wantError: nil,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			got, err := getAttrFromKey(tc.input)
+			if tc.wantError != nil {
+				require.EqualError(t, err, tc.wantError.Error())
+			} else {
+				require.Nil(t, err)
+				require.Equal(t, tc.wantName, got.name)
+				require.Equal(t, tc.wantType, got.dataType)
+			}
+		})
+	}
+
+}
+func TestValidateLSIs(t *testing.T) {
+	testCases := map[string]struct {
+		inputAttributes []string
+		inputLsis       []string
+		wantError       error
+	}{
+		"good case": {
+			inputLsis: []string{"userID:S"},
+			wantError: nil,
+		},
+		"bad lsi structure": {
+			inputLsis: []string{"userID"},
+			wantError: errDDBAttributeBadFormat,
+		},
+		"too many lsis": {
+			inputLsis: []string{"bowie:S", "clyde:S", "keno:S", "kava:S", "meow:S", "hana:S"},
+			wantError: errTooManyLsiKeys,
+		},
+	}
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			got := validateLSIs(tc.inputLsis)
+			if tc.wantError != nil {
+				require.EqualError(t, got, tc.wantError.Error())
+			} else {
+				require.Nil(t, got)
+			}
+		})
+	}
 }
 
 func TestIsCorrectFormat(t *testing.T) {
