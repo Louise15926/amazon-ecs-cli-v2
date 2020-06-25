@@ -21,3 +21,7 @@ func NameForService(app, env, svc string) string {
 func NameForEnv(app, env string) string {
 	return fmt.Sprintf("%s-%s", app, env)
 }
+
+func NameForTask(task string) string {
+	return fmt.Sprintf("task-%s", task)
+}

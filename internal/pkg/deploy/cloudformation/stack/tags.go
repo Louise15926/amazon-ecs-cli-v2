@@ -14,6 +14,7 @@ const (
 	AppTagKey     = "copilot-application"
 	EnvTagKey     = "copilot-environment"
 	ServiceTagKey = "copilot-service"
+	TaskTagKey    = "copilot-task"
 )
 
 func mergeAndFlattenTags(additionalTags map[string]string, cliTags map[string]string) []*cloudformation.Tag {
