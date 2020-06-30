@@ -1,7 +1,7 @@
 # Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 AWSTemplateFormatVersion: "2010-09-09"
-Description: CloudFormation template that represents a task on Amazon ECS.
+Description: "CloudFormation template that represents a task on Amazon ECS."
 Parameters:
   TaskName:
     Type: String
@@ -9,38 +9,38 @@ Parameters:
     Type: String
   TaskMemory:
     Type: String
-  ContainerImage:
-    Type: String
   LogRetention:
     Type: Number
     Default: 30
+  ContainerImage:
+    Type: String
   TaskRole:
     Type: String
   Command:
     Type: String
-  # TODO: env var needs to be a list of key-value pairs
-  EnvVars:
-    Type: String
+  # TODO: add EnvVars
 Conditions:
-  HasTaskRole:
-    !Not [!Equals [!Ref TaskRole, ""]]
+  HasImage:
+    !Not [!Equals [!Ref ContainerImage, ""]]
+  UseDefaultTaskRole:
+    !Equals [!Ref TaskRole, ""]
 Resources:
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
     DependsOn: ECRRepo
     Properties:
-      # TODO: Environment
       ContainerDefinitions:
-        Image: !Ref ContainerImage
-        Command: !Split [" ", !Ref Command]
-        LogConfiguration:
-          LogDriver: awslogs
-          Options:
-            awslogs-region: !Ref AWS::Region
-            awslogs-group: !Ref LogGroup
-            awslogs-stream-prefix: copilot-task
-        Name: !Ref TaskName
-      Family: !Join ['-', [!Ref TaskName]]
+        -
+          Image: !If [HasImage, !Ref ContainerImage, "AWS::NoValue"]
+          Command: !Split [" ", !Ref Command]
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-region: !Ref AWS::Region
+              awslogs-group: !Ref LogGroup
+              awslogs-stream-prefix: copilot-task
+          Name: !Ref TaskName
+      Family: !Join ['-', ["copilot", !Ref TaskName]]
       RequiresCompatibilities:
         - "FARGATE"
       NetworkMode: awsvpc
@@ -48,7 +48,17 @@ Resources:
       Memory: !Ref TaskMemory
       ExecutionRoleArn: !Ref ExecutionRole
       TaskRoleArn:
-        !If [HasTaskRole, !Ref TaskRole, !Ref "AWS::NoValue"]
+        !If [UseDefaultTaskRole, !Ref DefaultTaskRole, !Ref TaskRole]
+  DefaultTaskRole:
+    Condition: UseDefaultTaskRole
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
   ExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -67,21 +77,24 @@ Resources:
       RepositoryPolicyText:
         Version: '2008-10-17'
         Statement:
-          - Sid: "AllowPushPull"
-            Effect: Allow
-            Principal:
-              Aws:
-                - !Sub arn:aws:iam::${AWS::AccountId}:user/*
-            Action:
-              - ecr:GetDownloadUrlForLayer
-              - ecr:BatchGetImage
-              - ecr:BatchCheckLayerAvailability
-              - ecr:PutImage
-              - ecr:InitiateLayerUpload
-              - ecr:UploadLayerPart
-              - ecr:CompleteLayerUpload
+        - Sid: AllowPushPull
+          Effect: Allow
+          Principal:
+            AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+          Action:
+            - ecr:GetDownloadUrlForLayer
+            - ecr:BatchGetImage
+            - ecr:BatchCheckLayerAvailability
+            - ecr:PutImage
+            - ecr:InitiateLayerUpload
+            - ecr:UploadLayerPart
+            - ecr:CompleteLayerUpload
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: !Join ['', ["/copilot/", !Ref TaskName]]
       RetentionInDays: !Ref LogRetention
+Outputs:
+  ECRRepo:
+    Description: ECR Repo used to store images of task.
+    Value: !GetAtt ECRRepo.Arn
