@@ -6,10 +6,25 @@ package cli
 import (
 	"errors"
 	"fmt"
+
+	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/ecr"
+
+	cloudformation2 "github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/cloudformation"
+
+	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/deploy"
+	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/log"
+
+	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/ecs"
+
+	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/ec2"
+	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/session"
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/cli/selector"
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/config"
+	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/deploy/cloudformation"
+	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/docker"
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/color"
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/prompt"
+
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
@@ -22,16 +37,19 @@ var (
 	fmtTaskRunEnvPrompt       = fmt.Sprintf("In which %s would you like to run this %s?", color.Emphasize("environment"), color.Emphasize("task"))
 	fmtTaskRunGroupNamePrompt = fmt.Sprintf("What would you like to %s your task group?", color.Emphasize("name"))
 
-	taskRunEnvPromptHelp = fmt.Sprintf("Task will be deployed to the selected environment. " +
+	taskRunEnvPromptHelp = fmt.Sprintf("Task will be deployed to the selected environment. "+
 		"Select %s to run the task in your default VPC instead of any existing environment.", color.Emphasize(config.EnvNameNone))
 	taskRunGroupNamePromptHelp = "The group name of the task. Tasks with the same group name share the same set of resources, including CloudFormation stack, CloudWatch log group, task definition and ECR repository."
 )
 
+// TODO: replace this temporary image tag
+var imageTag = "1"
+
 type runTaskVars struct {
 	*GlobalOpts
-	count  int8
-	cpu    int16
-	memory int16
+	count  int64
+	cpu    int
+	memory int
 
 	groupName string
 
@@ -40,12 +58,12 @@ type runTaskVars struct {
 
 	taskRole string
 
-	subnet         string
+	subnets        []string
 	securityGroups []string
 	env            string
 
-	envVars  map[string]string
-	commands []string
+	envVars map[string]string
+	command string
 }
 
 type runTaskOpts struct {
@@ -56,6 +74,12 @@ type runTaskOpts struct {
 	store  store
 	parser dockerfileParser
 	sel    appEnvWithNoneSelector
+
+	docker dockerService
+	ecr    ecrService
+	ec2    vpcService
+	ecs    *ecs.ECS
+	cfn    cloudformation.CloudFormation
 }
 
 func newTaskRunOpts(vars runTaskVars) (*runTaskOpts, error) {
@@ -64,12 +88,18 @@ func newTaskRunOpts(vars runTaskVars) (*runTaskOpts, error) {
 		return nil, fmt.Errorf("new config store: %w", err)
 	}
 
+	sess, err := session.NewProvider().Default()
 	return &runTaskOpts{
 		runTaskVars: vars,
 
-		fs:    &afero.Afero{Fs: afero.NewOsFs()},
-		store: store,
-		sel:   selector.NewSelect(vars.prompt, store),
+		fs:     &afero.Afero{Fs: afero.NewOsFs()},
+		store:  store,
+		sel:    selector.NewSelect(vars.prompt, store),
+		docker: docker.New(),
+		ec2:    ec2.New(sess),
+		ecs:    ecs.New(sess),
+		ecr:    ecr.New(sess),
+		cfn:    cloudformation.New(sess),
 	}, nil
 }
 
@@ -103,7 +133,7 @@ func (o *runTaskOpts) Validate() error {
 		}
 	}
 
-	if o.env != "" && (o.subnet != "" || o.securityGroups != nil) {
+	if o.env != "" && (o.subnets != nil || o.securityGroups != nil) {
 		return errors.New("neither subnet nor security groups should be specified if environment is specified")
 	}
 
@@ -133,6 +163,113 @@ func (o *runTaskOpts) Ask() error {
 	return nil
 }
 
+// Execute create or update task resources and run the task.
+func (o *runTaskOpts) Execute() error {
+	if o.image == "" && o.dockerfilePath == "" {
+		o.dockerfilePath = "./Dockerfile"
+	}
+
+	if err := o.getNetworkConfig(); err != nil {
+		return err
+	}
+
+	if err := o.deployTaskResource(); err != nil {
+		return err
+	}
+
+	//if image is not provided, then we build the image and push to ECR repo
+	if o.image == "" {
+		uri, err := o.pushToECRRepo()
+		if err != nil {
+			return err
+		}
+		o.image = fmt.Sprintf("%s/%s", uri, imageTag)
+
+		// update image to stack
+		if err := o.deployTaskResource(); err != nil {
+			return err
+		}
+	}
+
+	// TODO: kick off task
+	return nil
+}
+
+func (o *runTaskOpts) getNetworkConfig() error {
+	if o.env != config.EnvNameNone {
+		subnets, err := o.ec2.GetSubnetIDsFromAppEnv(o.AppName(), o.env)
+		if err != nil {
+			return fmt.Errorf("get subnet ids: %w", err)
+		}
+
+		securityGroups, err := o.ec2.GetSecurityGroupsFromAppEnv(o.AppName(), o.env)
+		if err != nil {
+			return fmt.Errorf("get security groups: %w", err)
+		}
+
+		o.subnets = subnets
+		o.securityGroups = securityGroups
+
+		return nil
+	}
+
+	// get default subnet ids if not provided
+	if o.subnets == nil {
+		subnetIDs, err := o.ec2.GetDefaultSubnetIDs()
+		if err != nil {
+			return fmt.Errorf("get subnet ids: %w", err)
+		}
+		o.subnets = subnetIDs
+	}
+	return nil
+}
+
+func (o *runTaskOpts) deployTaskResource() error {
+	if err := o.cfn.DeployTask(&deploy.CreateTaskResourcesInput{
+		Name:     o.groupName,
+		Cpu:      o.cpu,
+		Memory:   o.memory,
+		Image:    o.image,
+		TaskRole: o.taskRole,
+		Command:  o.command,
+	}); err != nil {
+		var errChangeSetEmpty *cloudformation2.ErrChangeSetEmpty
+		if errors.As(err, &errChangeSetEmpty) {
+			return nil
+		}
+		log.Errorf("failed to deploy resources for task: %w", err)
+		return fmt.Errorf("deploy task: %w", err)
+	}
+	return nil
+}
+
+func (o *runTaskOpts) pushToECRRepo() (string, error) {
+	repoName := fmt.Sprintf("%s-%s", "copilot", o.groupName)
+
+	uri, err := o.ecr.GetRepository(repoName)
+	if err != nil {
+		return "", fmt.Errorf("get ECR repository URI: %w", err)
+	}
+
+	if err := o.docker.Build(uri, imageTag, o.dockerfilePath); err != nil {
+		return "", fmt.Errorf("build Dockerfile at %s with tag %s: %w", o.dockerfilePath, "", err)
+	}
+
+	auth, err := o.ecr.GetECRAuth()
+	if err != nil {
+		return "", fmt.Errorf("get ECR auth data: %w", err)
+	}
+
+	if err := o.docker.Login(uri, auth.Username, auth.Password); err != nil {
+		return "", fmt.Errorf("login to repo: %w", err)
+	}
+
+	if err := o.docker.Push(uri, imageTag); err != nil {
+		return "", fmt.Errorf("push to repo: %w", err)
+	}
+	return uri, nil
+}
+
 func (o *runTaskOpts) validateAppName() error {
 	if _, err := o.store.GetApplication(o.appName); err != nil {
 		return fmt.Errorf("get application: %w", err)
@@ -157,7 +294,7 @@ func (o *runTaskOpts) askTaskGroupName() error {
 		return nil
 	}
 
-	// TODO during Execute: list existing tasks like in ListApplications, ask whether to use existing tasks
+	// TODO: maybe list existing tasks like in ListApplications, ask whether to use existing tasks; require to implement task store first
 
 	groupName, err := o.prompt.Get(
 		fmtTaskRunGroupNamePrompt,
@@ -176,7 +313,7 @@ func (o *runTaskOpts) askEnvName() error {
 		return nil
 	}
 
-	if o.AppName() == "" {
+	if o.AppName() == "" || o.subnets != nil {
 		o.env = config.EnvNameNone
 		return nil
 	}
@@ -220,13 +357,17 @@ Run a task with environment variables.
 			if err := opts.Ask(); err != nil {
 				return err
 			}
+
+			if err := opts.Execute(); err != nil {
+				return err
+			}
 			return nil
 		}),
 	}
 
-	cmd.Flags().Int8Var(&vars.count, countFlag, 1, countFlagDescription)
-	cmd.Flags().Int16Var(&vars.cpu, cpuFlag, 256, cpuFlagDescription)
-	cmd.Flags().Int16Var(&vars.memory, memoryFlag, 512, memoryFlagDescription)
+	cmd.Flags().Int64Var(&vars.count, countFlag, 1, countFlagDescription)
+	cmd.Flags().IntVar(&vars.cpu, cpuFlag, 256, cpuFlagDescription)
+	cmd.Flags().IntVar(&vars.memory, memoryFlag, 512, memoryFlagDescription)
 
 	cmd.Flags().StringVarP(&vars.groupName, taskGroupNameFlag, nameFlagShort, "", taskGroupFlagDescription)
 
@@ -237,11 +378,11 @@ Run a task with environment variables.
 
 	cmd.Flags().StringVar(&vars.appName, appFlag, "", appFlagDescription)
 	cmd.Flags().StringVar(&vars.env, envFlag, "", envFlagDescription)
-	cmd.Flags().StringVar(&vars.subnet, subnetFlag, "", subnetFlagDescription)
+	cmd.Flags().StringSliceVar(&vars.subnets, subnetFlag, nil, subnetFlagDescription)
 	cmd.Flags().StringSliceVar(&vars.securityGroups, securityGroupsFlag, nil, securityGroupsFlagDescription)
 
 	cmd.Flags().StringToStringVar(&vars.envVars, envVarsFlag, nil, envVarsFlagDescription)
-	cmd.Flags().StringSliceVar(&vars.commands, commandsFlag, nil, commandsFlagDescription)
+	cmd.Flags().StringVar(&vars.command, commandsFlag, "", commandsFlagDescription)
 
 	return cmd
 }
