@@ -25,7 +25,7 @@ func New(s *session.Session) *EC2 {
 }
 
 // GetDefaultSubnetIDs finds the default subnet ids
-func (c *EC2) GetDefaultSubnetIDs() ([]string, error) {
+func (c *EC2) DefaultSubnetIDs() ([]string, error) {
 	response, err := c.client.DescribeSubnets(&ec2.DescribeSubnetsInput{
 		Filters: []*ec2.Filter{
 			{
