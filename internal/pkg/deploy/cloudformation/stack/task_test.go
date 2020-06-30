@@ -51,7 +51,7 @@ func TestTask_Template(t *testing.T) {
 				tc.mockReadParser(mockReadParser)
 			}
 
-			taskStack := &task{
+			taskStack := &taskStackConfig{
 				parser: mockReadParser,
 			}
 
@@ -85,38 +85,36 @@ func TestTask_Parameters(t *testing.T) {
 			ParameterValue: aws.String("512"),
 		},
 		{
-			ParameterKey:   aws.String(TaskCountParamKey),
-			ParameterValue: aws.String("3"),
-		},
-		{
 			ParameterKey:   aws.String(TaskLogRetentionParamKey),
 			ParameterValue: aws.String(taskLogRetention),
 		},
+		{
+			ParameterKey:   aws.String(TaskTaskRoleParamKey),
+			ParameterValue: aws.String("task-role"),
+		},
+		{
+			ParameterKey:   aws.String(TaskCommandParamKey),
+			ParameterValue: aws.String("echo hooray"),
+		},
 	}
 
-	task := &task{
-		name:   "my-task",
-		count:  3,
-		cpu:    256,
-		memory: 512,
+	task := &taskStackConfig{
+		Name:   "my-task",
+		Cpu:    256,
+		Memory: 512,
 
-		rc: RuntimeConfig{
-			ImageRepoURL: "7456.dkr.ecr.us-east-2.amazonaws.com/my-task",
-			ImageTag:     "0.1",
-		},
+		ImageURL: "7456.dkr.ecr.us-east-2.amazonaws.com/my-task:0.1",
+		TaskRole: "task-role",
+		Command:  "echo hooray",
 	}
 	params, _ := task.Parameters()
 	require.ElementsMatch(t, expectedParams, params)
 }
 
 func TestTask_StackName(t *testing.T) {
-	task := &task{
-		name: testTaskName,
+	task := &taskStackConfig{
+		Name: testTaskName,
 	}
 	got := task.StackName()
 	require.Equal(t, got, fmt.Sprintf("task-%s", testTaskName))
-}
-
-func TestTask_Tags(t *testing.T) {
-	require.True(t, false)
 }

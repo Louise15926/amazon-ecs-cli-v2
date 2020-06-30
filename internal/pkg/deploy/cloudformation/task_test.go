@@ -3,6 +3,8 @@ package cloudformation
 import (
 	"testing"
 
+	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/deploy"
+
 	"github.com/stretchr/testify/require"
 
 	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/cloudformation"
@@ -16,24 +18,25 @@ func TestCloudFormation_DeployTask(t *testing.T) {
 		stackName     = "copilot-my-task"
 		stackTemplate = "my-task template"
 	)
+	mockTask := &deploy.CreateTaskResourcesInput{
+		Name: "my-task",
+	}
 
 	testCases := map[string]struct {
 		mockCfnClient func(m *mocks.MockcfnClient)
 	}{
 		"create a new stack": {
 			mockCfnClient: func(m *mocks.MockcfnClient) {
-				stack := cloudformation.NewStack(stackName, stackTemplate)
-				m.EXPECT().CreateAndWait(stack).Return(nil)
+				m.EXPECT().CreateAndWait(gomock.Any()).Return(nil)
 				m.EXPECT().UpdateAndWait(gomock.Any()).Times(0)
 			},
 		},
 		"update the stack": {
 			mockCfnClient: func(m *mocks.MockcfnClient) {
-				stack := cloudformation.NewStack(stackName, stackTemplate)
-				m.EXPECT().CreateAndWait(stack).Return(&cloudformation.ErrStackAlreadyExists{
+				m.EXPECT().CreateAndWait(gomock.Any()).Return(&cloudformation.ErrStackAlreadyExists{
 					Name: "my-task",
 				})
-				m.EXPECT().UpdateAndWait(stack).Times(1).Return(nil)
+				m.EXPECT().UpdateAndWait(gomock.Any()).Times(1).Return(nil)
 			},
 		},
 	}
@@ -52,13 +55,7 @@ func TestCloudFormation_DeployTask(t *testing.T) {
 				cfnClient: mockCfnClient,
 			}
 
-			conf := mocks.NewMockStackConfiguration(ctrl)
-			conf.EXPECT().Template().Return(stackTemplate, nil)
-			conf.EXPECT().StackName().Return(stackName)
-			conf.EXPECT().Parameters().Return(nil, nil)
-			conf.EXPECT().Tags().Return(nil)
-
-			err := cf.DeployTask(conf)
+			err := cf.DeployTask(mockTask)
 			require.NoError(t, err)
 		})
 	}
