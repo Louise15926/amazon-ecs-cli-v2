@@ -40,10 +40,9 @@ var (
 	taskRunEnvPromptHelp = fmt.Sprintf("Task will be deployed to the selected environment. "+
 		"Select %s to run the task in your default VPC instead of any existing environment.", color.Emphasize(config.EnvNameNone))
 	taskRunGroupNamePromptHelp = "The group name of the task. Tasks with the same group name share the same set of resources, including CloudFormation stack, CloudWatch log group, task definition and ECR repository."
-)
 
-// TODO: replace this temporary image tag
-var imageTag = "1"
+	fmtImageURL = "%s:%s"
+)
 
 type runTaskVars struct {
 	*GlobalOpts
@@ -55,6 +54,7 @@ type runTaskVars struct {
 
 	image          string
 	dockerfilePath string
+	imageTag       string
 
 	taskRole string
 
@@ -183,7 +183,7 @@ func (o *runTaskOpts) Execute() error {
 		if err != nil {
 			return err
 		}
-		o.image = fmt.Sprintf("%s/%s", uri, imageTag)
+		o.image = fmt.Sprintf(fmtImageURL, uri, o.imageTag)
 
 		// update image to stack
 		if err := o.deployTaskResource(); err != nil {
@@ -251,7 +251,7 @@ func (o *runTaskOpts) pushToECRRepo() (string, error) {
 		return "", fmt.Errorf("get ECR repository URI: %w", err)
 	}
 
-	if err := o.docker.Build(uri, imageTag, o.dockerfilePath); err != nil {
+	if err := o.docker.Build(uri, o.imageTag, o.dockerfilePath); err != nil {
 		return "", fmt.Errorf("build Dockerfile at %s with tag %s: %w", o.dockerfilePath, "", err)
 	}
 
@@ -264,7 +264,7 @@ func (o *runTaskOpts) pushToECRRepo() (string, error) {
 		return "", fmt.Errorf("login to repo: %w", err)
 	}
 
-	if err := o.docker.Push(uri, imageTag); err != nil {
+	if err := o.docker.Push(uri, o.imageTag); err != nil {
 		return "", fmt.Errorf("push to repo: %w", err)
 	}
 	return uri, nil
@@ -373,6 +373,7 @@ Run a task with environment variables.
 
 	cmd.Flags().StringVar(&vars.image, imageFlag, "", imageFlagDescription)
 	cmd.Flags().StringVar(&vars.dockerfilePath, dockerFileFlag, "", dockerFileFlagDescription)
+	cmd.Flags().StringVar(&vars.imageTag, imageTagFlag, "", imageFlagDescription)
 
 	cmd.Flags().StringVar(&vars.taskRole, taskRoleFlag, "", taskRoleFlagDescription)
 
