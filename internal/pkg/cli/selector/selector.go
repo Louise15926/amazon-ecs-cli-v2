@@ -8,11 +8,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/config"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/color"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/log"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/prompt"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/workspace"
+	"github.com/aws/copilot-cli/internal/pkg/config"
+	"github.com/aws/copilot-cli/internal/pkg/term/color"
+	"github.com/aws/copilot-cli/internal/pkg/term/log"
+	"github.com/aws/copilot-cli/internal/pkg/term/prompt"
+	"github.com/aws/copilot-cli/internal/pkg/workspace"
 )
 
 // Prompter wraps the method for users to select an option from a list of options.
@@ -83,7 +83,7 @@ func (s *WorkspaceSelect) Service(prompt, help string) (string, error) {
 		return "", fmt.Errorf("list services: %w", err)
 	}
 	if len(serviceNames) == 1 {
-		log.Infof("Only found one service, defaulting to: %s\n", color.HighlightUserInput(serviceNames[0]))
+		log.Infof("Only found one service in workspace, defaulting to: %s\n", color.HighlightUserInput(serviceNames[0]))
 		return serviceNames[0], nil
 	}
 

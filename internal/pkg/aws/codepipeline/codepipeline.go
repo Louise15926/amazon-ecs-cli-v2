@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"time"
 
-	rg "github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/resourcegroups"
+	"github.com/xlab/treeprint"
+
+	rg "github.com/aws/copilot-cli/internal/pkg/aws/resourcegroups"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
@@ -59,7 +61,7 @@ type PipelineState struct {
 // StageState wraps a CodePipeline stage state.
 type StageState struct {
 	StageName  string        `json:"stageName"`
-	Actions    []StageAction `json:"actions"`
+	Actions    []StageAction `json:"actions,omitempty"`
 	Transition string        `json:"transition"`
 }
 
@@ -220,7 +222,6 @@ func (c *CodePipeline) GetPipelineState(name string) (*PipelineState, error) {
 		Name: aws.String(name),
 	}
 	resp, err := c.client.GetPipelineState(input)
-
 	if err != nil {
 		return nil, fmt.Errorf("get pipeline state %s: %w", name, err)
 	}
@@ -237,10 +238,10 @@ func (c *CodePipeline) GetPipelineState(name string) (*PipelineState, error) {
 				transition = "ENABLED"
 			}
 		}
-		var status []StageAction
+		var actions []StageAction
 		for _, actionState := range stage.ActionStates {
 			if actionState.LatestExecution != nil {
-				status = append(status, StageAction{
+				actions = append(actions, StageAction{
 					Name:   aws.StringValue(actionState.ActionName),
 					Status: aws.StringValue(actionState.LatestExecution.Status),
 				})
@@ -248,7 +249,7 @@ func (c *CodePipeline) GetPipelineState(name string) (*PipelineState, error) {
 		}
 		stageStates = append(stageStates, &StageState{
 			StageName:  stageName,
-			Actions:    status,
+			Actions:    actions,
 			Transition: transition,
 		})
 	}
@@ -257,6 +258,10 @@ func (c *CodePipeline) GetPipelineState(name string) (*PipelineState, error) {
 		StageStates:  stageStates,
 		UpdatedAt:    *resp.Updated,
 	}, nil
+}
+
+func (sa StageAction) humanString() string {
+	return sa.Name + "\t" + sa.Status
 }
 
 // HumanString returns the stringified PipelineState struct with human readable format.
@@ -272,5 +277,12 @@ func (ss *StageState) HumanString() string {
 	if transition == "" {
 		transition = empty
 	}
-	return fmt.Sprintf("  %s\t%s\t%s\n", ss.StageName, status, transition)
+	stageString := fmt.Sprintf("%s\t%s\t%s", ss.StageName, status, transition)
+	tree := treeprint.New()
+	tree = tree.AddBranch(stageString)
+	var formattedActions []string
+	for _, action := range ss.Actions {
+		formattedActions = append(formattedActions, tree.AddNode(action.humanString()).String())
+	}
+	return tree.String()
 }

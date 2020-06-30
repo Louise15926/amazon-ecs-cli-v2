@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	cpmocks "github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/codepipeline/mocks"
-	rgmocks "github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/resourcegroups/mocks"
 	"github.com/aws/aws-sdk-go/aws"
+	cpmocks "github.com/aws/copilot-cli/internal/pkg/aws/codepipeline/mocks"
+	rgmocks "github.com/aws/copilot-cli/internal/pkg/aws/resourcegroups/mocks"
 	"github.com/golang/mock/gomock"
 
 	"github.com/aws/aws-sdk-go/service/codepipeline"
@@ -376,6 +376,10 @@ func TestCodePipeline_GetPipelineState(t *testing.T) {
 				ActionStates: []*codepipeline.ActionState{
 					{
 						ActionName:      aws.String("action1"),
+						LatestExecution: &codepipeline.ActionExecution{Status: aws.String(codepipeline.ActionExecutionStatusSucceeded)},
+					},
+					{
+						ActionName:      aws.String("TestCommands"),
 						LatestExecution: &codepipeline.ActionExecution{Status: aws.String(codepipeline.ActionExecutionStatusFailed)},
 					},
 				},
@@ -445,6 +449,10 @@ func TestCodePipeline_GetPipelineState(t *testing.T) {
 						Actions: []StageAction{
 							{
 								Name:   "action1",
+								Status: "Succeeded",
+							},
+							{
+								Name:   "TestCommands",
 								Status: "Failed",
 							},
 						},

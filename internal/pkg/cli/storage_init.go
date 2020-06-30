@@ -9,14 +9,14 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/addon"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/cli/selector"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/config"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/template"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/color"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/log"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/prompt"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/workspace"
+	"github.com/aws/copilot-cli/internal/pkg/addon"
+	"github.com/aws/copilot-cli/internal/pkg/cli/selector"
+	"github.com/aws/copilot-cli/internal/pkg/config"
+	"github.com/aws/copilot-cli/internal/pkg/template"
+	"github.com/aws/copilot-cli/internal/pkg/term/color"
+	"github.com/aws/copilot-cli/internal/pkg/term/log"
+	"github.com/aws/copilot-cli/internal/pkg/term/prompt"
+	"github.com/aws/copilot-cli/internal/pkg/workspace"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -134,7 +134,7 @@ type initStorageOpts struct {
 	store store
 
 	app *config.Application
-	sel configSelector
+	sel wsSelector
 }
 
 func newStorageInitOpts(vars initStorageVars) (*initStorageOpts, error) {
@@ -154,7 +154,7 @@ func newStorageInitOpts(vars initStorageVars) (*initStorageOpts, error) {
 		fs:    &afero.Afero{Fs: afero.NewOsFs()},
 		store: store,
 		ws:    ws,
-		sel:   selector.NewConfigSelect(vars.prompt, store),
+		sel:   selector.NewWorkspaceSelect(vars.prompt, store, ws),
 	}, nil
 }
 
@@ -292,7 +292,6 @@ func (o *initStorageOpts) askStorageSvc() error {
 	}
 	svc, err := o.sel.Service(storageInitSvcPrompt,
 		storageInitSvcHelp,
-		o.AppName(),
 	)
 	if err != nil {
 		return fmt.Errorf("retrieve local service names: %w", err)

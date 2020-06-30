@@ -7,23 +7,23 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/ecr"
+	"github.com/aws/copilot-cli/internal/pkg/aws/ecr"
 
-	cloudformation2 "github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/cloudformation"
+	awscfn "github.com/aws/copilot-cli/internal/pkg/aws/cloudformation"
 
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/deploy"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/log"
+	"github.com/aws/copilot-cli/internal/pkg/deploy"
+	"github.com/aws/copilot-cli/internal/pkg/term/log"
 
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/ecs"
+	"github.com/aws/copilot-cli/internal/pkg/aws/ecs"
 
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/ec2"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/session"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/cli/selector"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/config"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/deploy/cloudformation"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/docker"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/color"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/term/prompt"
+	"github.com/aws/copilot-cli/internal/pkg/aws/ec2"
+	"github.com/aws/copilot-cli/internal/pkg/aws/session"
+	"github.com/aws/copilot-cli/internal/pkg/cli/selector"
+	"github.com/aws/copilot-cli/internal/pkg/config"
+	"github.com/aws/copilot-cli/internal/pkg/deploy/cloudformation"
+	"github.com/aws/copilot-cli/internal/pkg/docker"
+	"github.com/aws/copilot-cli/internal/pkg/term/color"
+	"github.com/aws/copilot-cli/internal/pkg/term/prompt"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -237,7 +237,7 @@ func (o *runTaskOpts) deployTaskResource() error {
 		TaskRole: o.taskRole,
 		Command:  o.command,
 	}); err != nil {
-		var errChangeSetEmpty *cloudformation2.ErrChangeSetEmpty
+		var errChangeSetEmpty *awscfn.ErrChangeSetEmpty
 		if errors.As(err, &errChangeSetEmpty) {
 			return nil
 		}
