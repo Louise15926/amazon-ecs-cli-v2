@@ -1172,6 +1172,74 @@ func (mr *MockecrServiceMockRecorder) GetECRAuth() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetECRAuth", reflect.TypeOf((*MockecrService)(nil).GetECRAuth))
 }
 
+// MockvpcService is a mock of vpcService interface
+type MockvpcService struct {
+	ctrl     *gomock.Controller
+	recorder *MockvpcServiceMockRecorder
+}
+
+// MockvpcServiceMockRecorder is the mock recorder for MockvpcService
+type MockvpcServiceMockRecorder struct {
+	mock *MockvpcService
+}
+
+// NewMockvpcService creates a new mock instance
+func NewMockvpcService(ctrl *gomock.Controller) *MockvpcService {
+	mock := &MockvpcService{ctrl: ctrl}
+	mock.recorder = &MockvpcServiceMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MockvpcService) EXPECT() *MockvpcServiceMockRecorder {
+	return m.recorder
+}
+
+// GetDefaultSubnetIDs mocks base method
+func (m *MockvpcService) GetDefaultSubnetIDs() ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDefaultSubnetIDs")
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDefaultSubnetIDs indicates an expected call of GetDefaultSubnetIDs
+func (mr *MockvpcServiceMockRecorder) GetDefaultSubnetIDs() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDefaultSubnetIDs", reflect.TypeOf((*MockvpcService)(nil).GetDefaultSubnetIDs))
+}
+
+// GetSubnetIDsFromAppEnv mocks base method
+func (m *MockvpcService) GetSubnetIDsFromAppEnv(app, env string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSubnetIDsFromAppEnv", app, env)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSubnetIDsFromAppEnv indicates an expected call of GetSubnetIDsFromAppEnv
+func (mr *MockvpcServiceMockRecorder) GetSubnetIDsFromAppEnv(app, env interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetIDsFromAppEnv", reflect.TypeOf((*MockvpcService)(nil).GetSubnetIDsFromAppEnv), app, env)
+}
+
+// GetSecurityGroupsFromAppEnv mocks base method
+func (m *MockvpcService) GetSecurityGroupsFromAppEnv(app, env string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSecurityGroupsFromAppEnv", app, env)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetSecurityGroupsFromAppEnv indicates an expected call of GetSecurityGroupsFromAppEnv
+func (mr *MockvpcServiceMockRecorder) GetSecurityGroupsFromAppEnv(app, env interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSecurityGroupsFromAppEnv", reflect.TypeOf((*MockvpcService)(nil).GetSecurityGroupsFromAppEnv), app, env)
+}
+
 // MockcwlogService is a mock of cwlogService interface
 type MockcwlogService struct {
 	ctrl     *gomock.Controller

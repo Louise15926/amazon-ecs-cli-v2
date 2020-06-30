@@ -133,6 +133,12 @@ type ecrService interface {
 	GetECRAuth() (ecr.Auth, error)
 }
 
+type vpcService interface {
+	GetDefaultSubnetIDs() ([]string, error)
+	GetSubnetIDsFromAppEnv(app string, env string) ([]string, error)
+	GetSecurityGroupsFromAppEnv(app string, env string) ([]string, error)
+}
+
 type cwlogService interface {
 	TaskLogEvents(logGroupName string, streamLastEventTime map[string]int64, opts ...cloudwatchlogs.GetLogEventsOpts) (*cloudwatchlogs.LogEventsOutput, error)
 	LogGroupExists(logGroupName string) (bool, error)
