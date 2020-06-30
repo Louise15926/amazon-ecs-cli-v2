@@ -3,13 +3,13 @@ package cloudformation
 import (
 	"testing"
 
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/deploy"
+	"github.com/aws/copilot-cli/internal/pkg/deploy"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/cloudformation"
+	"github.com/aws/copilot-cli/internal/pkg/aws/cloudformation"
 
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/deploy/cloudformation/mocks"
+	"github.com/aws/copilot-cli/internal/pkg/deploy/cloudformation/mocks"
 	"github.com/golang/mock/gomock"
 )
 

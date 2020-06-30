@@ -3,10 +3,10 @@ package cloudformation
 import (
 	"errors"
 
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/deploy"
+	"github.com/aws/copilot-cli/internal/pkg/deploy"
 
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/aws/cloudformation"
-	"github.com/aws/amazon-ecs-cli-v2/internal/pkg/deploy/cloudformation/stack"
+	"github.com/aws/copilot-cli/internal/pkg/aws/cloudformation"
+	"github.com/aws/copilot-cli/internal/pkg/deploy/cloudformation/stack"
 )
 
 // DeployTask deploys a task stack and waits until the deployment is done.
