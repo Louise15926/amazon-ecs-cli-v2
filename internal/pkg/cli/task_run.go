@@ -169,6 +169,10 @@ func (o *runTaskOpts) Execute() error {
 		o.dockerfilePath = "./Dockerfile"
 	}
 
+	if o.imageTag == "" {
+		o.imageTag = "latest"
+	}
+
 	if err := o.getNetworkConfig(); err != nil {
 		return err
 	}

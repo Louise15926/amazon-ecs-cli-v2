@@ -532,8 +532,10 @@ func TestTaskRunOpts_pushToECRRepo(t *testing.T) {
 	testCases := map[string]struct {
 		inGroupName      string
 		inDockerfilePath string
-		mockEcr          func(m *mocks.MockecrService)
-		mockDocker       func(m *mocks.MockdockerService)
+		inImageTag       string
+
+		mockEcr    func(m *mocks.MockecrService)
+		mockDocker func(m *mocks.MockdockerService)
 
 		wantedError error
 		wantedUri   string
@@ -541,15 +543,16 @@ func TestTaskRunOpts_pushToECRRepo(t *testing.T) {
 		"success": {
 			inGroupName:      "my-task",
 			inDockerfilePath: "./Dockerfile",
+			inImageTag:       "0.1",
 
 			mockEcr: func(m *mocks.MockecrService) {
 				m.EXPECT().GetRepository("copilot-my-task").Return("aws.ecr.my-task", nil).Times(1)
 				m.EXPECT().GetECRAuth().Return(ecr.Auth{}, nil).Times(1)
 			},
 			mockDocker: func(m *mocks.MockdockerService) {
-				m.EXPECT().Build("aws.ecr.my-task", imageTag, "./Dockerfile").Return(nil).Times(1)
+				m.EXPECT().Build("aws.ecr.my-task", "0.1", "./Dockerfile").Return(nil).Times(1)
 				m.EXPECT().Login("aws.ecr.my-task", gomock.Any(), gomock.Any()).Return(nil).Times(1)
-				m.EXPECT().Push("aws.ecr.my-task", imageTag).Return(nil).Times(1)
+				m.EXPECT().Push("aws.ecr.my-task", "0.1").Return(nil).Times(1)
 			},
 			wantedUri: "aws.ecr.my-task",
 		},
@@ -574,6 +577,7 @@ func TestTaskRunOpts_pushToECRRepo(t *testing.T) {
 				runTaskVars: runTaskVars{
 					groupName:      tc.inGroupName,
 					dockerfilePath: tc.inDockerfilePath,
+					imageTag:       tc.inImageTag,
 				},
 				ecr:    mockEcr,
 				docker: mockDocker,
