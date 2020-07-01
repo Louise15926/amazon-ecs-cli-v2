@@ -265,7 +265,7 @@ func (o *runTaskOpts) pushToECRRepo() (string, error) {
 	}
 
 	if err := o.docker.Login(uri, auth.Username, auth.Password); err != nil {
-		return "", fmt.Errorf("login to repo: %w", err)
+		return "", fmt.Errorf("login to repo %s: %w", repoName,  err)
 	}
 
 	if err := o.docker.Push(uri, o.imageTag); err != nil {
