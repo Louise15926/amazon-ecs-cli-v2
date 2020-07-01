@@ -77,11 +77,11 @@ type runTaskOpts struct {
 	parser dockerfileParser
 	sel    appEnvWithNoneSelector
 
-	docker dockerService
-	ecr    ecrService
-	ec2    vpcService
-	ecs    *ecs.ECS
-	cfn    cloudformation.CloudFormation
+	docker    dockerService
+	ecrGetter ecrService
+	vpcGetter vpcService
+	deployer  taskResourceDeployer
+	ecs       *ecs.ECS
 }
 
 func newTaskRunOpts(vars runTaskVars) (*runTaskOpts, error) {
@@ -94,14 +94,14 @@ func newTaskRunOpts(vars runTaskVars) (*runTaskOpts, error) {
 	return &runTaskOpts{
 		runTaskVars: vars,
 
-		fs:     &afero.Afero{Fs: afero.NewOsFs()},
-		store:  store,
-		sel:    selector.NewSelect(vars.prompt, store),
-		docker: docker.New(),
-		ec2:    ec2.New(sess),
-		ecs:    ecs.New(sess),
-		ecr:    ecr.New(sess),
-		cfn:    cloudformation.New(sess),
+		fs:        &afero.Afero{Fs: afero.NewOsFs()},
+		store:     store,
+		sel:       selector.NewSelect(vars.prompt, store),
+		docker:    docker.New(),
+		vpcGetter: ec2.New(sess),
+		ecs:       ecs.New(sess),
+		ecrGetter: ecr.New(sess),
+		deployer:  cloudformation.New(sess),
 	}, nil
 }
 
@@ -179,7 +179,7 @@ func (o *runTaskOpts) Execute() error {
 		return err
 	}
 
-	if err := o.deployTaskResource(); err != nil {
+	if err := o.createAndUpdateTaskResources(); err != nil {
 		return err
 	}
 
@@ -192,7 +192,7 @@ func (o *runTaskOpts) Execute() error {
 		o.image = fmt.Sprintf(fmtImageURL, uri, o.imageTag)
 
 		// update image to stack
-		if err := o.deployTaskResource(); err != nil {
+		if err := o.createAndUpdateTaskResources(); err != nil {
 			return err
 		}
 	}
@@ -203,12 +203,12 @@ func (o *runTaskOpts) Execute() error {
 
 func (o *runTaskOpts) getNetworkConfig() error {
 	if o.env != config.EnvNameNone {
-		subnets, err := o.ec2.GetSubnetIDs(o.AppName(), o.env)
+		subnets, err := o.vpcGetter.GetSubnetIDs(o.AppName(), o.env)
 		if err != nil {
 			return fmt.Errorf("get subnet IDs: %w", err)
 		}
 
-		securityGroups, err := o.ec2.GetSecurityGroups(o.AppName(), o.env)
+		securityGroups, err := o.vpcGetter.GetSecurityGroups(o.AppName(), o.env)
 		if err != nil {
 			return fmt.Errorf("get security groups: %w", err)
 		}
@@ -221,7 +221,7 @@ func (o *runTaskOpts) getNetworkConfig() error {
 
 	// get default subnet IDs if not provided
 	if o.subnets == nil {
-		subnetIDs, err := o.ec2.GetDefaultSubnetIDs()
+		subnetIDs, err := o.vpcGetter.GetDefaultSubnetIDs()
 		if err != nil {
 			return fmt.Errorf("get subnet IDs: %w", err)
 		}
@@ -230,8 +230,8 @@ func (o *runTaskOpts) getNetworkConfig() error {
 	return nil
 }
 
-func (o *runTaskOpts) deployTaskResource() error {
-	if err := o.cfn.DeployTask(&deploy.CreateTaskResourcesInput{
+func (o *runTaskOpts) createAndUpdateTaskResources() error {
+	if err := o.deployer.DeployTask(&deploy.CreateTaskResourcesInput{
 		Name:     o.groupName,
 		Cpu:      o.cpu,
 		Memory:   o.memory,
@@ -251,7 +251,7 @@ func (o *runTaskOpts) deployTaskResource() error {
 func (o *runTaskOpts) pushToECRRepo() (string, error) {
 	repoName := fmt.Sprintf(fmtRepoName, o.groupName)
 
-	uri, err := o.ecr.GetRepository(repoName)
+	uri, err := o.ecrGetter.GetRepository(repoName)
 	if err != nil {
 		return "", fmt.Errorf("get ECR repository URI: %w", err)
 	}
@@ -260,7 +260,7 @@ func (o *runTaskOpts) pushToECRRepo() (string, error) {
 		return "", fmt.Errorf("build Dockerfile at %s with tag %s: %w", o.dockerfilePath, o.imageTag, err)
 	}
 
-	auth, err := o.ecr.GetECRAuth()
+	auth, err := o.ecrGetter.GetECRAuth()
 	if err != nil {
 		return "", fmt.Errorf("get ECR auth data: %w", err)
 	}

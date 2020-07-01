@@ -509,7 +509,7 @@ func TestTaskRunOpts_getEnvironment(t *testing.T) {
 					subnets:        tc.inSubnets,
 					securityGroups: tc.inSecurityGroups,
 				},
-				ec2: mockVpc,
+				vpcGetter: mockVpc,
 			}
 
 			err := opts.getNetworkConfig()
@@ -580,8 +580,8 @@ func TestTaskRunOpts_pushToECRRepo(t *testing.T) {
 					dockerfilePath: tc.inDockerfilePath,
 					imageTag:       tc.inImageTag,
 				},
-				ecr:    mockEcr,
-				docker: mockDocker,
+				ecrGetter: mockEcr,
+				docker:    mockDocker,
 			}
 
 			uri, err := opts.pushToECRRepo()

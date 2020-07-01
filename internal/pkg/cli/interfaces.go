@@ -250,6 +250,10 @@ type environmentDeployer interface {
 	GetEnvironment(appName, envName string) (*config.Environment, error)
 }
 
+type taskResourceDeployer interface {
+	DeployTask(input *deploy.CreateTaskResourcesInput) error
+}
+
 type svcDeleter interface {
 	DeleteService(in deploy.DeleteServiceInput) error
 }

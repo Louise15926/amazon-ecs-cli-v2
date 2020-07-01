@@ -12,15 +12,11 @@ import (
 // DeployTask deploys a task stack and waits until the deployment is done.
 // If the task stack doesn't exist, then it creates the stack.
 // If the task stack already exists, it updates the stack.
-func (cf CloudFormation) DeployTask(input *deploy.CreateTaskResourcesInput, opts ...cloudformation.StackOption) error {
+func (cf CloudFormation) DeployTask(input *deploy.CreateTaskResourcesInput) error {
 	conf := stack.NewTaskStackConfig(input)
 	stack, err := toStack(conf)
 	if err != nil {
 		return err
-	}
-
-	for _, opt := range opts {
-		opt(stack)
 	}
 
 	if err := cf.cfnClient.CreateAndWait(stack); err != nil {
