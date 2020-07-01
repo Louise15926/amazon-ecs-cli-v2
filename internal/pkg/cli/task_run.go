@@ -256,7 +256,7 @@ func (o *runTaskOpts) pushToECRRepo() (string, error) {
 	}
 
 	if err := o.docker.Build(uri, o.imageTag, o.dockerfilePath); err != nil {
-		return "", fmt.Errorf("build Dockerfile at %s with tag %s: %w", o.dockerfilePath, "", err)
+		return "", fmt.Errorf("build Dockerfile at %s with tag %s: %w", o.dockerfilePath, o.imageTag, err)
 	}
 
 	auth, err := o.ecr.GetECRAuth()
