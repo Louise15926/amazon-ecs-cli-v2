@@ -18,7 +18,7 @@ var (
 )
 
 const (
-	fmtFilterDefault = "default-for-az"
+	filterDefault = "default-for-az"
 )
 
 type api interface {
@@ -38,58 +38,28 @@ func New(s *session.Session) *EC2 {
 
 // GetDefaultSubnetIDs finds the default subnet IDs
 func (c *EC2) GetDefaultSubnetIDs() ([]string, error) {
-	response, err := c.client.DescribeSubnets(&ec2.DescribeSubnetsInput{
-		Filters: []*ec2.Filter{
-			{
-				Name:   aws.String(fmtFilterDefault),
-				Values: aws.StringSlice([]string{"true"}),
-			},
+	filters := []*ec2.Filter{
+		&ec2.Filter{
+			Name:   aws.String(filterDefault),
+			Values: aws.StringSlice([]string{"true"}),
 		},
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("find default subnet IDs: %w", err)
 	}
-
-	if len(response.Subnets) == 0 {
-		return nil, errors.New("no default subnet ID found")
-	}
-
-	subnetIDs := make([]string, len(response.Subnets))
-	for _, subnet := range response.Subnets {
-		subnetIDs = append(subnetIDs, aws.StringValue(subnet.SubnetId))
-	}
-	return subnetIDs, nil
+	return c.getSubnetIDs(filters)
 }
 
 // GetDefaultSubnetIDs finds the subnet IDs associated with the environment of the application
 func (c *EC2) GetSubnetIDs(app string, env string) ([]string, error) {
-	response, err := c.client.DescribeSubnets(&ec2.DescribeSubnetsInput{
-		Filters: []*ec2.Filter{
-			{
-				Name:   aws.String(fmtFilterTagApp),
-				Values: aws.StringSlice([]string{app}),
-			},
-			{
-				Name:   aws.String(fmtFilterTagEnv),
-				Values: aws.StringSlice([]string{env}),
-			},
+	filters := []*ec2.Filter{
+		&ec2.Filter{
+			Name:   aws.String(fmtFilterTagApp),
+			Values: aws.StringSlice([]string{app}),
 		},
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("get subnet IDs from environment: %w", err)
+		&ec2.Filter{
+			Name:   aws.String(fmtFilterTagEnv),
+			Values: aws.StringSlice([]string{env}),
+		},
 	}
-
-	if len(response.Subnets) == 0 {
-		return nil, fmt.Errorf("no subnet id found for %s app %s env", app, env)
-	}
-
-	subnetIDs := make([]string, len(response.Subnets))
-	for _, subnet := range response.Subnets {
-		subnetIDs = append(subnetIDs, aws.StringValue(subnet.SubnetId))
-	}
-	return subnetIDs, nil
+	return c.getSubnetIDs(filters)
 }
 
 // GetDefaultSubnetIDs finds the security group IDs associated with the environment of the application
@@ -116,4 +86,24 @@ func (c *EC2) GetSecurityGroups(app string, env string) ([]string, error) {
 		securityGroups = append(securityGroups, aws.StringValue(sg.GroupId))
 	}
 	return securityGroups, nil
+}
+
+func (c *EC2) getSubnetIDs(filters []*ec2.Filter) ([]string, error) {
+	response, err := c.client.DescribeSubnets(&ec2.DescribeSubnetsInput{
+		Filters: filters,
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("find subnet IDs: %w", err)
+	}
+
+	if len(response.Subnets) == 0 {
+		return nil, errors.New("no subnet ID found")
+	}
+
+	subnetIDs := make([]string, len(response.Subnets))
+	for _, subnet := range response.Subnets {
+		subnetIDs = append(subnetIDs, aws.StringValue(subnet.SubnetId))
+	}
+	return subnetIDs, nil
 }
