@@ -217,7 +217,7 @@ func TestTaskRunOpts_Validate(t *testing.T) {
 			inEnv:       "test",
 			wantedError: errNoAppInWorkspace,
 		},
-		"both environment and subnet id specified": {
+		"both environment and subnet ID specified": {
 			basicOpts: defaultOpts,
 
 			inEnv:     "test",
@@ -439,8 +439,8 @@ func TestTaskRunOpts_getEnvironment(t *testing.T) {
 			env:     "test",
 
 			mockVPC: func(m *mocks.MockvpcService) {
-				m.EXPECT().GetSubnetIDsFromAppEnv("my-app", "test").Return([]string{"subnet-3", "subnet-4"}, nil).Times(1)
-				m.EXPECT().GetSecurityGroupsFromAppEnv("my-app", "test").Return([]string{"sg-3", "sg-4"}, nil).Times(1)
+				m.EXPECT().GetSubnetIDs("my-app", "test").Return([]string{"subnet-3", "subnet-4"}, nil).Times(1)
+				m.EXPECT().GetSecurityGroups("my-app", "test").Return([]string{"sg-3", "sg-4"}, nil).Times(1)
 			},
 
 			wantedSubnets:        []string{"subnet-3", "subnet-4"},
@@ -461,10 +461,10 @@ func TestTaskRunOpts_getEnvironment(t *testing.T) {
 			env:     "test",
 
 			mockVPC: func(m *mocks.MockvpcService) {
-				m.EXPECT().GetSubnetIDsFromAppEnv("my-app", "test").Return(nil, errors.New("error")).Times(1)
+				m.EXPECT().GetSubnetIDs("my-app", "test").Return(nil, errors.New("error")).Times(1)
 			},
 
-			wantedError: errors.New("get subnet ids: error"),
+			wantedError: errors.New("get subnet IDs: error"),
 		},
 		"error getting security groups from app env": {
 			appName:   "my-app",
@@ -472,8 +472,8 @@ func TestTaskRunOpts_getEnvironment(t *testing.T) {
 			inSubnets: []string{"subnet-1"},
 
 			mockVPC: func(m *mocks.MockvpcService) {
-				m.EXPECT().GetSubnetIDsFromAppEnv("my-app", "test").Return(nil, nil).Times(1)
-				m.EXPECT().GetSecurityGroupsFromAppEnv("my-app", "test").Return(nil, errors.New("error")).Times(1)
+				m.EXPECT().GetSubnetIDs("my-app", "test").Return(nil, nil).Times(1)
+				m.EXPECT().GetSecurityGroups("my-app", "test").Return(nil, errors.New("error")).Times(1)
 			},
 
 			wantedError: errors.New("get security groups: error"),
@@ -485,7 +485,7 @@ func TestTaskRunOpts_getEnvironment(t *testing.T) {
 				m.EXPECT().GetDefaultSubnetIDs().Return(nil, errors.New("error")).Times(1)
 			},
 
-			wantedError: errors.New("get subnet ids: error"),
+			wantedError: errors.New("get subnet IDs: error"),
 		},
 	}
 

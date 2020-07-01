@@ -6,9 +6,6 @@ package mocks
 
 import (
 	encoding "encoding"
-	io "io"
-	reflect "reflect"
-
 	session "github.com/aws/aws-sdk-go/aws/session"
 	cloudwatchlogs "github.com/aws/copilot-cli/internal/pkg/aws/cloudwatchlogs"
 	codepipeline "github.com/aws/copilot-cli/internal/pkg/aws/codepipeline"
@@ -22,6 +19,8 @@ import (
 	command "github.com/aws/copilot-cli/internal/pkg/term/command"
 	workspace "github.com/aws/copilot-cli/internal/pkg/workspace"
 	gomock "github.com/golang/mock/gomock"
+	io "io"
+	reflect "reflect"
 )
 
 // MockactionCommand is a mock of actionCommand interface
@@ -1211,34 +1210,34 @@ func (mr *MockvpcServiceMockRecorder) GetDefaultSubnetIDs() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDefaultSubnetIDs", reflect.TypeOf((*MockvpcService)(nil).GetDefaultSubnetIDs))
 }
 
-// GetSubnetIDsFromAppEnv mocks base method
-func (m *MockvpcService) GetSubnetIDsFromAppEnv(app, env string) ([]string, error) {
+// GetSubnetIDs mocks base method
+func (m *MockvpcService) GetSubnetIDs(app, env string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSubnetIDsFromAppEnv", app, env)
+	ret := m.ctrl.Call(m, "GetSubnetIDs", app, env)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetSubnetIDsFromAppEnv indicates an expected call of GetSubnetIDsFromAppEnv
-func (mr *MockvpcServiceMockRecorder) GetSubnetIDsFromAppEnv(app, env interface{}) *gomock.Call {
+// GetSubnetIDs indicates an expected call of GetSubnetIDs
+func (mr *MockvpcServiceMockRecorder) GetSubnetIDs(app, env interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetIDsFromAppEnv", reflect.TypeOf((*MockvpcService)(nil).GetSubnetIDsFromAppEnv), app, env)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSubnetIDs", reflect.TypeOf((*MockvpcService)(nil).GetSubnetIDs), app, env)
 }
 
-// GetSecurityGroupsFromAppEnv mocks base method
-func (m *MockvpcService) GetSecurityGroupsFromAppEnv(app, env string) ([]string, error) {
+// GetSecurityGroups mocks base method
+func (m *MockvpcService) GetSecurityGroups(app, env string) ([]string, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetSecurityGroupsFromAppEnv", app, env)
+	ret := m.ctrl.Call(m, "GetSecurityGroups", app, env)
 	ret0, _ := ret[0].([]string)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetSecurityGroupsFromAppEnv indicates an expected call of GetSecurityGroupsFromAppEnv
-func (mr *MockvpcServiceMockRecorder) GetSecurityGroupsFromAppEnv(app, env interface{}) *gomock.Call {
+// GetSecurityGroups indicates an expected call of GetSecurityGroups
+func (mr *MockvpcServiceMockRecorder) GetSecurityGroups(app, env interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSecurityGroupsFromAppEnv", reflect.TypeOf((*MockvpcService)(nil).GetSecurityGroupsFromAppEnv), app, env)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSecurityGroups", reflect.TypeOf((*MockvpcService)(nil).GetSecurityGroups), app, env)
 }
 
 // MockcwlogService is a mock of cwlogService interface
