@@ -135,8 +135,8 @@ type ecrService interface {
 
 type vpcService interface {
 	GetDefaultSubnetIDs() ([]string, error)
-	GetSubnetIDsFromAppEnv(app string, env string) ([]string, error)
-	GetSecurityGroupsFromAppEnv(app string, env string) ([]string, error)
+	GetSubnetIDs(app string, env string) ([]string, error)
+	GetSecurityGroups(app string, env string) ([]string, error)
 }
 
 type cwlogService interface {

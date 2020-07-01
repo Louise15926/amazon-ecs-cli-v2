@@ -3,13 +3,25 @@ package ec2
 import (
 	"fmt"
 
+	"github.com/pkg/errors"
+
+	"github.com/aws/copilot-cli/internal/pkg/deploy/cloudformation/stack"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
 )
 
+var (
+	fmtFilterTagApp = fmt.Sprintf("tag:%s", stack.AppTagKey)
+	fmtFilterTagEnv = fmt.Sprintf("tag:%s", stack.EnvTagKey)
+)
+
+const (
+	fmtFilterDefault = "default-for-az"
+)
+
 type api interface {
-	DescribeVpcs(*ec2.DescribeVpcsInput) (*ec2.DescribeVpcsOutput, error)
 	DescribeSubnets(*ec2.DescribeSubnetsInput) (*ec2.DescribeSubnetsOutput, error)
 	DescribeSecurityGroups(*ec2.DescribeSecurityGroupsInput) (*ec2.DescribeSecurityGroupsOutput, error)
 }
@@ -24,19 +36,23 @@ func New(s *session.Session) *EC2 {
 	}
 }
 
-// GetDefaultSubnetIDs finds the default subnet ids
-func (c *EC2) DefaultSubnetIDs() ([]string, error) {
+// GetDefaultSubnetIDs finds the default subnet IDs
+func (c *EC2) GetDefaultSubnetIDs() ([]string, error) {
 	response, err := c.client.DescribeSubnets(&ec2.DescribeSubnetsInput{
 		Filters: []*ec2.Filter{
 			{
-				Name:   aws.String("default-for-az"),
+				Name:   aws.String(fmtFilterDefault),
 				Values: aws.StringSlice([]string{"true"}),
 			},
 		},
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("find default subnet ids: %w", err)
+		return nil, fmt.Errorf("find default subnet IDs: %w", err)
+	}
+
+	if len(response.Subnets) == 0 {
+		return nil, errors.New("no default subnet ID found")
 	}
 
 	subnetIDs := make([]string, len(response.Subnets))
@@ -46,22 +62,27 @@ func (c *EC2) DefaultSubnetIDs() ([]string, error) {
 	return subnetIDs, nil
 }
 
-func (c *EC2) GetSubnetIDsFromAppEnv(app string, env string) ([]string, error) {
+// GetDefaultSubnetIDs finds the subnet IDs associated with the environment of the application
+func (c *EC2) GetSubnetIDs(app string, env string) ([]string, error) {
 	response, err := c.client.DescribeSubnets(&ec2.DescribeSubnetsInput{
 		Filters: []*ec2.Filter{
 			{
-				Name:   aws.String("tag:copilot-application"),
+				Name:   aws.String(fmtFilterTagApp),
 				Values: aws.StringSlice([]string{app}),
 			},
 			{
-				Name:   aws.String("tag:copilot-environment"),
+				Name:   aws.String(fmtFilterTagEnv),
 				Values: aws.StringSlice([]string{env}),
 			},
 		},
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("get subnet ids from environment: %w", err)
+		return nil, fmt.Errorf("get subnet IDs from environment: %w", err)
+	}
+
+	if len(response.Subnets) == 0 {
+		return nil, fmt.Errorf("no subnet id found for %s app %s env", app, env)
 	}
 
 	subnetIDs := make([]string, len(response.Subnets))
@@ -71,15 +92,16 @@ func (c *EC2) GetSubnetIDsFromAppEnv(app string, env string) ([]string, error) {
 	return subnetIDs, nil
 }
 
-func (c *EC2) GetSecurityGroupsFromAppEnv(app string, env string) ([]string, error) {
+// GetDefaultSubnetIDs finds the security group IDs associated with the environment of the application
+func (c *EC2) GetSecurityGroups(app string, env string) ([]string, error) {
 	response, err := c.client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
 		Filters: []*ec2.Filter{
 			{
-				Name:   aws.String("tag:copilot-application"),
+				Name:   aws.String(fmtFilterTagApp),
 				Values: aws.StringSlice([]string{app}),
 			},
 			{
-				Name:   aws.String("tag:copilot-environment"),
+				Name:   aws.String(fmtFilterTagEnv),
 				Values: aws.StringSlice([]string{env}),
 			},
 		},

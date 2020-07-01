@@ -11,10 +11,8 @@ import (
 
 	awscfn "github.com/aws/copilot-cli/internal/pkg/aws/cloudformation"
 
-	"github.com/aws/copilot-cli/internal/pkg/deploy"
-	"github.com/aws/copilot-cli/internal/pkg/term/log"
-
 	"github.com/aws/copilot-cli/internal/pkg/aws/ecs"
+	"github.com/aws/copilot-cli/internal/pkg/deploy"
 
 	"github.com/aws/copilot-cli/internal/pkg/aws/ec2"
 	"github.com/aws/copilot-cli/internal/pkg/aws/session"
@@ -42,7 +40,11 @@ var (
 	taskRunGroupNamePromptHelp = "The group name of the task. Tasks with the same group name share the same set of resources, including CloudFormation stack, CloudWatch log group, task definition and ECR repository."
 
 	fmtImageURL = "%s:%s"
+	fmtRepoName = "copilot-%s"
 )
+
+const defaultImageTag = "latest"
+const defaultDockerfilePath = "./Dockerfile"
 
 type runTaskVars struct {
 	*GlobalOpts
@@ -166,11 +168,11 @@ func (o *runTaskOpts) Ask() error {
 // Execute create or update task resources and run the task.
 func (o *runTaskOpts) Execute() error {
 	if o.image == "" && o.dockerfilePath == "" {
-		o.dockerfilePath = "./Dockerfile"
+		o.dockerfilePath = defaultDockerfilePath
 	}
 
 	if o.imageTag == "" {
-		o.imageTag = "latest"
+		o.imageTag = defaultImageTag
 	}
 
 	if err := o.getNetworkConfig(); err != nil {
@@ -201,12 +203,12 @@ func (o *runTaskOpts) Execute() error {
 
 func (o *runTaskOpts) getNetworkConfig() error {
 	if o.env != config.EnvNameNone {
-		subnets, err := o.ec2.GetSubnetIDsFromAppEnv(o.AppName(), o.env)
+		subnets, err := o.ec2.GetSubnetIDs(o.AppName(), o.env)
 		if err != nil {
-			return fmt.Errorf("get subnet ids: %w", err)
+			return fmt.Errorf("get subnet IDs: %w", err)
 		}
 
-		securityGroups, err := o.ec2.GetSecurityGroupsFromAppEnv(o.AppName(), o.env)
+		securityGroups, err := o.ec2.GetSecurityGroups(o.AppName(), o.env)
 		if err != nil {
 			return fmt.Errorf("get security groups: %w", err)
 		}
@@ -217,11 +219,11 @@ func (o *runTaskOpts) getNetworkConfig() error {
 		return nil
 	}
 
-	// get default subnet ids if not provided
+	// get default subnet IDs if not provided
 	if o.subnets == nil {
 		subnetIDs, err := o.ec2.GetDefaultSubnetIDs()
 		if err != nil {
-			return fmt.Errorf("get subnet ids: %w", err)
+			return fmt.Errorf("get subnet IDs: %w", err)
 		}
 		o.subnets = subnetIDs
 	}
@@ -241,14 +243,13 @@ func (o *runTaskOpts) deployTaskResource() error {
 		if errors.As(err, &errChangeSetEmpty) {
 			return nil
 		}
-		log.Errorf("failed to deploy resources for task: %w", err)
-		return fmt.Errorf("deploy task: %w", err)
+		return fmt.Errorf("failed to deploy resources for task %s: %w", o.groupName, err)
 	}
 	return nil
 }
 
 func (o *runTaskOpts) pushToECRRepo() (string, error) {
-	repoName := fmt.Sprintf("%s-%s", "copilot", o.groupName)
+	repoName := fmt.Sprintf(fmtRepoName, o.groupName)
 
 	uri, err := o.ecr.GetRepository(repoName)
 	if err != nil {
@@ -265,7 +266,7 @@ func (o *runTaskOpts) pushToECRRepo() (string, error) {
 	}
 
 	if err := o.docker.Login(uri, auth.Username, auth.Password); err != nil {
-		return "", fmt.Errorf("login to repo %s: %w", repoName,  err)
+		return "", fmt.Errorf("login to repo %s: %w", repoName, err)
 	}
 
 	if err := o.docker.Push(uri, o.imageTag); err != nil {
