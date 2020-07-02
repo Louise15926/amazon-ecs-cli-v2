@@ -18,7 +18,6 @@ Parameters:
     Type: String
   Command:
     Type: String
-  # TODO: add EnvVars
 Conditions:
   HasImage:
     !Not [!Equals [!Ref ContainerImage, ""]]
@@ -40,6 +39,9 @@ Resources:
               awslogs-group: !Ref LogGroup
               awslogs-stream-prefix: copilot-task
           Name: !Ref TaskName
+          {{if .EnvVars}}Environment:{{range $name, $value := .EnvVars}}
+          - Name: {{$name}}
+          - Value: {{$value}}{{end}}{{end}}
       Family: !Join ['-', ["copilot", !Ref TaskName]]
       RequiresCompatibilities:
         - "FARGATE"
@@ -77,18 +79,18 @@ Resources:
       RepositoryPolicyText:
         Version: '2008-10-17'
         Statement:
-        - Sid: AllowPushPull
-          Effect: Allow
-          Principal:
-            AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
-          Action:
-            - ecr:GetDownloadUrlForLayer
-            - ecr:BatchGetImage
-            - ecr:BatchCheckLayerAvailability
-            - ecr:PutImage
-            - ecr:InitiateLayerUpload
-            - ecr:UploadLayerPart
-            - ecr:CompleteLayerUpload
+          - Sid: AllowPushPull
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action:
+              - ecr:GetDownloadUrlForLayer
+              - ecr:BatchGetImage
+              - ecr:BatchCheckLayerAvailability
+              - ecr:PutImage
+              - ecr:InitiateLayerUpload
+              - ecr:UploadLayerPart
+              - ecr:CompleteLayerUpload
   LogGroup:
     Type: AWS::Logs::LogGroup
     Properties:

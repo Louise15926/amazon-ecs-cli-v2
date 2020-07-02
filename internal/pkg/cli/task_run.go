@@ -285,6 +285,7 @@ func (o *runTaskOpts) createAndUpdateTaskResources() error {
 		Image:    o.image,
 		TaskRole: o.taskRole,
 		Command:  o.command,
+		EnvVars:  o.envVars,
 	}); err != nil {
 		var errChangeSetEmpty *awscfn.ErrChangeSetEmpty
 		if !errors.As(err, &errChangeSetEmpty) {

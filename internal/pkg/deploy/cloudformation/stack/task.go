@@ -34,6 +34,7 @@ type taskStackConfig struct {
 	ImageURL string
 	TaskRole string
 	Command  string
+	EnvVars map[string]string
 
 	parser template.ReadParser
 }
@@ -47,6 +48,7 @@ func NewTaskStackConfig(taskOpts *deploy.CreateTaskResourcesInput) *taskStackCon
 		ImageURL: taskOpts.Image,
 		TaskRole: taskOpts.TaskRole,
 		Command:  taskOpts.Command,
+		EnvVars: taskOpts.EnvVars,
 
 		parser: template.New(),
 	}
@@ -57,7 +59,11 @@ func (t *taskStackConfig) StackName() string {
 }
 
 func (t *taskStackConfig) Template() (string, error) {
-	content, err := t.parser.Read(taskTemplatePath)
+	content, err := t.parser.Parse(taskTemplatePath, struct{
+		EnvVars map[string]string
+	}{
+		EnvVars: t.EnvVars,
+	})
 	if err != nil {
 		return "", fmt.Errorf("read template for task stack: %w", err)
 	}
