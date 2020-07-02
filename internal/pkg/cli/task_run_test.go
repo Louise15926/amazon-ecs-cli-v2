@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/aws/copilot-cli/internal/pkg/aws/ecr"
-
 	"github.com/aws/copilot-cli/internal/pkg/cli/mocks"
 	"github.com/aws/copilot-cli/internal/pkg/config"
 

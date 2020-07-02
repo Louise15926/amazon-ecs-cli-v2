@@ -7,26 +7,22 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/aws/copilot-cli/internal/pkg/deploy/cloudformation/stack"
-
-	"github.com/aws/copilot-cli/internal/pkg/aws/resourcegroups"
-
-	"github.com/aws/copilot-cli/internal/pkg/aws/ecr"
-
 	awscfn "github.com/aws/copilot-cli/internal/pkg/aws/cloudformation"
-
-	"github.com/aws/copilot-cli/internal/pkg/deploy"
-
 	"github.com/aws/copilot-cli/internal/pkg/aws/ec2"
+	"github.com/aws/copilot-cli/internal/pkg/aws/ecr"
 	"github.com/aws/copilot-cli/internal/pkg/aws/ecs"
+	"github.com/aws/copilot-cli/internal/pkg/aws/resourcegroups"
 	"github.com/aws/copilot-cli/internal/pkg/aws/session"
 	"github.com/aws/copilot-cli/internal/pkg/cli/selector"
 	"github.com/aws/copilot-cli/internal/pkg/config"
+	"github.com/aws/copilot-cli/internal/pkg/deploy"
 	"github.com/aws/copilot-cli/internal/pkg/deploy/cloudformation"
+	"github.com/aws/copilot-cli/internal/pkg/deploy/cloudformation/stack"
 	"github.com/aws/copilot-cli/internal/pkg/docker"
 	"github.com/aws/copilot-cli/internal/pkg/term/color"
+	"github.com/aws/copilot-cli/internal/pkg/term/log"
+	termprogress "github.com/aws/copilot-cli/internal/pkg/term/progress"
 	"github.com/aws/copilot-cli/internal/pkg/term/prompt"
-
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 )
@@ -91,6 +87,8 @@ type runTaskOpts struct {
 	ecsGetter        ecsService
 	resourceDeployer taskResourceDeployer
 	starter          taskStarter
+
+	spinner progress
 }
 
 func newTaskRunOpts(vars runTaskVars) (*runTaskOpts, error) {
@@ -114,6 +112,8 @@ func newTaskRunOpts(vars runTaskVars) (*runTaskOpts, error) {
 		resourceGetter:   resourcegroups.New(sess),
 		ecsGetter:        ecs.New(sess),
 		starter:          ecs.New(sess),
+
+		spinner: termprogress.NewSpinner(),
 	}, nil
 }
 
@@ -251,6 +251,8 @@ func (o *runTaskOpts) runTask(cluster string) error {
 		return fmt.Errorf("run task %s: %w", o.groupName, err)
 	}
 
+	// TODO: waitUntilTasksRunning
+	log.Successln(fmt.Sprintf("Task %s is running", o.groupName))
 	return nil
 }
 
@@ -274,6 +276,7 @@ func (o *runTaskOpts) getNetworkConfig() error {
 }
 
 func (o *runTaskOpts) createAndUpdateTaskResources() error {
+	o.spinner.Start(fmt.Sprintf("Deploying resources for task %s", color.HighlightUserInput(o.groupName)))
 	if err := o.resourceDeployer.DeployTask(&deploy.CreateTaskResourcesInput{
 		Name:     o.groupName,
 		Cpu:      o.cpu,
@@ -283,11 +286,12 @@ func (o *runTaskOpts) createAndUpdateTaskResources() error {
 		Command:  o.command,
 	}); err != nil {
 		var errChangeSetEmpty *awscfn.ErrChangeSetEmpty
-		if errors.As(err, &errChangeSetEmpty) {
-			return nil
+		if !errors.As(err, &errChangeSetEmpty) {
+			o.spinner.Stop(log.Serrorln("Failed to deploy task resources."))
+			return fmt.Errorf("failed to deploy resources for task %s: %w", o.groupName, err)
 		}
-		return fmt.Errorf("failed to deploy resources for task %s: %w", o.groupName, err)
 	}
+	o.spinner.Stop("\n")
 	return nil
 }
 

@@ -1,17 +1,14 @@
 package ec2
 
 import (
+	"errors"
 	"fmt"
-
-	"github.com/aws/copilot-cli/internal/pkg/config"
-
-	"github.com/pkg/errors"
-
-	"github.com/aws/copilot-cli/internal/pkg/deploy/cloudformation/stack"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ec2"
+	"github.com/aws/copilot-cli/internal/pkg/config"
+	"github.com/aws/copilot-cli/internal/pkg/deploy/cloudformation/stack"
 )
 
 var (
