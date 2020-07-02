@@ -65,28 +65,22 @@ func (c *EC2) GetSubnetIDs(app string, env string) ([]string, error) {
 // GetDefaultSubnetIDs finds the security group IDs associated with the environment of the application; if env is a
 // None env, it finds the default subnet IDs.
 func (c *EC2) GetSecurityGroups(app string, env string) ([]string, error) {
-	response, err := c.client.DescribeSecurityGroups(&ec2.DescribeSecurityGroupsInput{
-		Filters: []*ec2.Filter{
-			{
-				Name:   aws.String(fmtFilterTagApp),
-				Values: aws.StringSlice([]string{app}),
-			},
-			{
-				Name:   aws.String(fmtFilterTagEnv),
-				Values: aws.StringSlice([]string{env}),
-			},
+	if env == config.EnvNameNone {
+		return c.getDefaultSecurityGroupIDs()
+	}
+
+	filters := []*ec2.Filter{
+		{
+			Name:   aws.String(fmtFilterTagApp),
+			Values: aws.StringSlice([]string{app}),
 		},
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("get security groups from environment: %w", err)
+		{
+			Name:   aws.String(fmtFilterTagEnv),
+			Values: aws.StringSlice([]string{env}),
+		},
 	}
 
-	securityGroups := make([]string, len(response.SecurityGroups))
-	for _, sg := range response.SecurityGroups {
-		securityGroups = append(securityGroups, aws.StringValue(sg.GroupId))
-	}
-	return securityGroups, nil
+	return c.getSecurityGroups(filters)
 }
 
 func (c *EC2) getDefaultSubnetIDs() ([]string, error) {
@@ -127,8 +121,8 @@ func (c *EC2) getSecurityGroups(filters []*ec2.Filter) ([]string, error) {
 	}
 
 	securityGroups := make([]string, len(response.SecurityGroups))
-	for _, sg := range response.SecurityGroups {
-		securityGroups = append(securityGroups, aws.StringValue(sg.GroupId))
+	for idx, sg := range response.SecurityGroups {
+		securityGroups[idx] = aws.StringValue(sg.GroupId)
 	}
 	return securityGroups, nil
 }

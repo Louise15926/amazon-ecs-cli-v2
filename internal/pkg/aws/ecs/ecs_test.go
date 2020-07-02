@@ -467,11 +467,11 @@ func TestECS_RunTask(t *testing.T) {
 			}
 
 			err := ecs.RunTask(RunTaskInput{
-				count:          tc.count,
-				cluster:        tc.cluster,
-				taskFamilyName: tc.taskFamilyName,
-				subnets:        tc.subnets,
-				securityGroups: tc.securityGroups,
+				Count:          tc.count,
+				Cluster:        tc.cluster,
+				TaskFamilyName: tc.taskFamilyName,
+				Subnets:        tc.subnets,
+				SecurityGroups: tc.securityGroups,
 			})
 
 			if tc.wantedError != nil {

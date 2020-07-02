@@ -11,9 +11,6 @@ import (
 
 	"github.com/aws/copilot-cli/internal/pkg/aws/resourcegroups"
 
-	"github.com/aws/aws-sdk-go/aws"
-	awsecs "github.com/aws/aws-sdk-go/service/ecs"
-
 	"github.com/aws/copilot-cli/internal/pkg/aws/ecr"
 
 	awscfn "github.com/aws/copilot-cli/internal/pkg/aws/cloudformation"
@@ -21,6 +18,7 @@ import (
 	"github.com/aws/copilot-cli/internal/pkg/deploy"
 
 	"github.com/aws/copilot-cli/internal/pkg/aws/ec2"
+	"github.com/aws/copilot-cli/internal/pkg/aws/ecs"
 	"github.com/aws/copilot-cli/internal/pkg/aws/session"
 	"github.com/aws/copilot-cli/internal/pkg/cli/selector"
 	"github.com/aws/copilot-cli/internal/pkg/config"
@@ -54,7 +52,6 @@ const (
 	defaultImageTag       = "latest"
 	defaultDockerfilePath = "./Dockerfile"
 	clusterResourceType   = "AWS::ECS::Cluster"
-	runTaskStartedBy      = "copilot-task"
 )
 
 type runTaskVars struct {
@@ -83,18 +80,17 @@ type runTaskOpts struct {
 	runTaskVars
 
 	// Interfaces to interact with dependencies.
-	fs     afero.Fs
-	store  store
-	parser dockerfileParser
-	sel    appEnvWithNoneSelector
+	fs    afero.Fs
+	store store
+	sel   appEnvWithNoneSelector
 
-	docker    dockerService
-	ecrGetter ecrService
-	vpcGetter vpcService
-	deployer  taskResourceDeployer
-	ecs       *awsecs.ECS
-
-	resourceGetter resourceGroupsClient
+	docker           dockerService
+	ecrGetter        ecrService
+	vpcGetter        vpcService
+	resourceGetter   resourceGroupsClient
+	ecsGetter        ecsService
+	resourceDeployer taskResourceDeployer
+	starter          taskStarter
 }
 
 func newTaskRunOpts(vars runTaskVars) (*runTaskOpts, error) {
@@ -107,16 +103,17 @@ func newTaskRunOpts(vars runTaskVars) (*runTaskOpts, error) {
 	return &runTaskOpts{
 		runTaskVars: vars,
 
-		fs:        &afero.Afero{Fs: afero.NewOsFs()},
-		store:     store,
-		sel:       selector.NewSelect(vars.prompt, store),
-		docker:    docker.New(),
-		vpcGetter: ec2.New(sess),
-		ecs:       awsecs.New(sess),
-		ecrGetter: ecr.New(sess),
-		deployer:  cloudformation.New(sess),
+		fs:    &afero.Afero{Fs: afero.NewOsFs()},
+		store: store,
+		sel:   selector.NewSelect(vars.prompt, store),
 
-		resourceGetter: resourcegroups.New(sess),
+		docker:           docker.New(),
+		ecrGetter:        ecr.New(sess),
+		vpcGetter:        ec2.New(sess),
+		resourceDeployer: cloudformation.New(sess),
+		resourceGetter:   resourcegroups.New(sess),
+		ecsGetter:        ecs.New(sess),
+		starter:          ecs.New(sess),
 	}, nil
 }
 
@@ -222,19 +219,14 @@ func (o *runTaskOpts) Execute() error {
 
 func (o *runTaskOpts) getCluster() (string, error) {
 	if o.env == config.EnvNameNone {
-		resp, err := o.ecs.DescribeClusters(&awsecs.DescribeClustersInput{})
+		clusters, err := o.ecsGetter.DefaultClusters()
 		if err != nil {
 			return "", fmt.Errorf("get default cluster: %w", err)
-		}
-
-		clusters := make([]string, len(resp.Clusters))
-		for idx, cluster := range resp.Clusters {
-			clusters[idx] = aws.StringValue(cluster.ClusterArn)
 		}
 		return clusters[0], nil
 	}
 
-	resources, err := o.resourceGetter.GetResourcesByTags(clusterResourceType, map[string]string{
+	clusters, err := o.resourceGetter.GetResourcesByTags(clusterResourceType, map[string]string{
 		stack.AppTagKey: o.AppName(),
 		stack.EnvTagKey: o.env,
 	})
@@ -243,23 +235,18 @@ func (o *runTaskOpts) getCluster() (string, error) {
 		return "", fmt.Errorf("get cluster: %w", err)
 	}
 
-	return resources[0], nil
+	return clusters[0], nil
 }
 
 func (o *runTaskOpts) runTask(cluster string) error {
-	_, err := o.ecs.RunTask(&awsecs.RunTaskInput{
-		Cluster:        aws.String(cluster),
-		Count:          aws.Int64(o.count),
-		LaunchType:     aws.String(awsecs.LaunchTypeFargate),
-		StartedBy:      aws.String(runTaskStartedBy),
-		TaskDefinition: aws.String(fmt.Sprintf(fmtTaskFamilyName, o.groupName)),
-		NetworkConfiguration: &awsecs.NetworkConfiguration{
-			AwsvpcConfiguration: &awsecs.AwsVpcConfiguration{
-				AssignPublicIp: aws.String(awsecs.AssignPublicIpEnabled),
-				Subnets:        aws.StringSlice(o.subnets),
-			},
-		},
+	err := o.starter.RunTask(ecs.RunTaskInput{
+		Cluster:        cluster,
+		Count:          o.count,
+		Subnets:        o.subnets,
+		SecurityGroups: o.securityGroups,
+		TaskFamilyName: fmt.Sprintf(fmtTaskFamilyName, o.groupName),
 	})
+
 	if err != nil {
 		return fmt.Errorf("run task %s: %w", o.groupName, err)
 	}
@@ -287,7 +274,7 @@ func (o *runTaskOpts) getNetworkConfig() error {
 }
 
 func (o *runTaskOpts) createAndUpdateTaskResources() error {
-	if err := o.deployer.DeployTask(&deploy.CreateTaskResourcesInput{
+	if err := o.resourceDeployer.DeployTask(&deploy.CreateTaskResourcesInput{
 		Name:     o.groupName,
 		Cpu:      o.cpu,
 		Memory:   o.memory,

@@ -143,6 +143,10 @@ type cwlogService interface {
 	LogGroupExists(logGroupName string) (bool, error)
 }
 
+type ecsService interface {
+	DefaultClusters() ([]string, error)
+}
+
 type templater interface {
 	Template() (string, error)
 }
@@ -251,6 +255,10 @@ type environmentDeployer interface {
 
 type taskResourceDeployer interface {
 	DeployTask(input *deploy.CreateTaskResourcesInput) error
+}
+
+type taskStarter interface {
+	RunTask(input ecs.RunTaskInput) error
 }
 
 type svcDeleter interface {

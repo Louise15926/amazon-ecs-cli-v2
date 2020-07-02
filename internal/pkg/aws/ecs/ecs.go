@@ -103,11 +103,11 @@ type Image struct {
 }
 
 type RunTaskInput struct {
-	cluster        string
-	count          int64
-	subnets        []string
-	securityGroups []string
-	taskFamilyName string
+	Cluster        string
+	Count          int64
+	Subnets        []string
+	SecurityGroups []string
+	TaskFamilyName string
 }
 
 // New returns a Service configured against the input session.
@@ -196,21 +196,21 @@ func (e *ECS) DefaultClusters() ([]string, error) {
 // RunTask runs a number of tasks with the task definition and network configurations in a cluster
 func (e *ECS) RunTask(input RunTaskInput) error {
 	_, err := e.client.RunTask(&ecs.RunTaskInput{
-		Cluster:        aws.String(input.cluster),
-		Count:          aws.Int64(input.count),
+		Cluster:        aws.String(input.Cluster),
+		Count:          aws.Int64(input.Count),
 		LaunchType:     aws.String(ecs.LaunchTypeFargate),
 		StartedBy:      aws.String(runTaskStartedBy),
-		TaskDefinition: aws.String(input.taskFamilyName),
+		TaskDefinition: aws.String(input.TaskFamilyName),
 		NetworkConfiguration: &ecs.NetworkConfiguration{
 			AwsvpcConfiguration: &ecs.AwsVpcConfiguration{
 				AssignPublicIp: aws.String(ecs.AssignPublicIpEnabled),
-				Subnets:        aws.StringSlice(input.subnets),
-				SecurityGroups: aws.StringSlice(input.securityGroups),
+				Subnets:        aws.StringSlice(input.Subnets),
+				SecurityGroups: aws.StringSlice(input.SecurityGroups),
 			},
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("run task(s) with group name %s: %w", input.taskFamilyName, err)
+		return fmt.Errorf("run task(s) with group name %s: %w", input.TaskFamilyName, err)
 	}
 	return nil
 }

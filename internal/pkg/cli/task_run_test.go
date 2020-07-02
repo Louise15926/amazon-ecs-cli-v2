@@ -8,14 +8,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/aws/copilot-cli/internal/pkg/aws/resourcegroups"
-
-	awsecs "github.com/aws/aws-sdk-go/service/ecs"
-
-	"github.com/aws/copilot-cli/internal/pkg/aws/ec2"
-	"github.com/aws/copilot-cli/internal/pkg/aws/session"
-	"github.com/aws/copilot-cli/internal/pkg/term/log"
-
 	"github.com/aws/copilot-cli/internal/pkg/aws/ecr"
 
 	"github.com/aws/copilot-cli/internal/pkg/cli/mocks"
@@ -598,72 +590,4 @@ func TestTaskRunOpts_pushToECRRepo(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestTaskRunOpts_runTask(t *testing.T) {
-	sess, err := session.NewProvider().Default()
-	if err != nil {
-		log.Errorf("error getting session: %w", sess)
-		return
-	}
-
-	t.Run("run task test", func(t *testing.T) {
-		opts := runTaskOpts{
-			runTaskVars: runTaskVars{
-				GlobalOpts: &GlobalOpts{
-					appName: "expr-exec",
-				},
-				count:     1,
-				groupName: "task-expr",
-				env:       "test",
-			},
-			vpcGetter: ec2.New(sess),
-			ecs:       awsecs.New(sess),
-		}
-
-		err := opts.getNetworkConfig()
-		if err != nil {
-			log.Errorf("error getting network config: %w", err)
-			return
-		}
-
-		err = opts.runTask("defaultCluster")
-		if err != nil {
-			log.Errorf("error running task: %w", err)
-		}
-		log.Info("629")
-	})
-}
-
-func TestTaskRunOpts_getCluster(t *testing.T) {
-	sess, err := session.NewProvider().Default()
-	if err != nil {
-		log.Errorf("error getting session: %w", sess)
-		return
-	}
-
-	t.Run("run task test", func(t *testing.T) {
-		opts := runTaskOpts{
-			runTaskVars: runTaskVars{
-				GlobalOpts: &GlobalOpts{
-					appName: "expr-exec",
-				},
-				count:     1,
-				groupName: "task-expr",
-				env:       "test",
-			},
-			vpcGetter:      ec2.New(sess),
-			ecs:            awsecs.New(sess),
-			resourceGetter: resourcegroups.New(sess),
-		}
-
-		resources, err := opts.getCluster()
-		if err != nil {
-			log.Errorf("error running task: %w", err)
-		}
-		for _, cluster := range resources {
-			log.Infoln(cluster)
-		}
-		//log.Infoln(resources)
-	})
 }
