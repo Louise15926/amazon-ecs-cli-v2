@@ -2377,6 +2377,43 @@ func (mr *MockenvironmentDeployerMockRecorder) GetEnvironment(appName, envName i
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEnvironment", reflect.TypeOf((*MockenvironmentDeployer)(nil).GetEnvironment), appName, envName)
 }
 
+// MocktaskResourceDeployer is a mock of taskResourceDeployer interface
+type MocktaskResourceDeployer struct {
+	ctrl     *gomock.Controller
+	recorder *MocktaskResourceDeployerMockRecorder
+}
+
+// MocktaskResourceDeployerMockRecorder is the mock recorder for MocktaskResourceDeployer
+type MocktaskResourceDeployerMockRecorder struct {
+	mock *MocktaskResourceDeployer
+}
+
+// NewMocktaskResourceDeployer creates a new mock instance
+func NewMocktaskResourceDeployer(ctrl *gomock.Controller) *MocktaskResourceDeployer {
+	mock := &MocktaskResourceDeployer{ctrl: ctrl}
+	mock.recorder = &MocktaskResourceDeployerMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MocktaskResourceDeployer) EXPECT() *MocktaskResourceDeployerMockRecorder {
+	return m.recorder
+}
+
+// DeployTask mocks base method
+func (m *MocktaskResourceDeployer) DeployTask(input *deploy.CreateTaskResourcesInput) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeployTask", input)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeployTask indicates an expected call of DeployTask
+func (mr *MocktaskResourceDeployerMockRecorder) DeployTask(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeployTask", reflect.TypeOf((*MocktaskResourceDeployer)(nil).DeployTask), input)
+}
+
 // MocksvcDeleter is a mock of svcDeleter interface
 type MocksvcDeleter struct {
 	ctrl     *gomock.Controller

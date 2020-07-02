@@ -20,6 +20,7 @@ const (
 	shortTaskIDLength      = 8
 	shortImageDigestLength = 8
 	imageDigestPrefix      = "sha256:"
+	runTaskStartedBy       = "copilot-task"
 )
 
 type api interface {
@@ -27,6 +28,8 @@ type api interface {
 	DescribeTaskDefinition(input *ecs.DescribeTaskDefinitionInput) (*ecs.DescribeTaskDefinitionOutput, error)
 	DescribeServices(input *ecs.DescribeServicesInput) (*ecs.DescribeServicesOutput, error)
 	ListTasks(input *ecs.ListTasksInput) (*ecs.ListTasksOutput, error)
+	DescribeClusters(input *ecs.DescribeClustersInput) (*ecs.DescribeClustersOutput, error)
+	RunTask(input *ecs.RunTaskInput) (*ecs.RunTaskOutput, error)
 }
 
 // ECS wraps an AWS ECS client.
@@ -99,6 +102,14 @@ type Image struct {
 	Digest string
 }
 
+type RunTaskInput struct {
+	cluster        string
+	count          int64
+	subnets        []string
+	securityGroups []string
+	taskFamilyName string
+}
+
 // New returns a Service configured against the input session.
 func New(s *session.Session) *ECS {
 	return &ECS{
@@ -166,6 +177,42 @@ func (e *ECS) ServiceTasks(clusterName, serviceName string) ([]*Task, error) {
 		}
 	}
 	return tasks, nil
+}
+
+// DefaultClusters returns the default clusters in the account and region
+func (e *ECS) DefaultClusters() ([]string, error) {
+	resp, err := e.client.DescribeClusters(&ecs.DescribeClustersInput{})
+	if err != nil {
+		return nil, fmt.Errorf("get default clusters: %w", err)
+	}
+
+	clusters := make([]string, len(resp.Clusters))
+	for idx, cluster := range resp.Clusters {
+		clusters[idx] = aws.StringValue(cluster.ClusterArn)
+	}
+	return clusters, nil
+}
+
+// RunTask runs a number of tasks with the task definition and network configurations in a cluster
+func (e *ECS) RunTask(input RunTaskInput) error {
+	_, err := e.client.RunTask(&ecs.RunTaskInput{
+		Cluster:        aws.String(input.cluster),
+		Count:          aws.Int64(input.count),
+		LaunchType:     aws.String(ecs.LaunchTypeFargate),
+		StartedBy:      aws.String(runTaskStartedBy),
+		TaskDefinition: aws.String(input.taskFamilyName),
+		NetworkConfiguration: &ecs.NetworkConfiguration{
+			AwsvpcConfiguration: &ecs.AwsVpcConfiguration{
+				AssignPublicIp: aws.String(ecs.AssignPublicIpEnabled),
+				Subnets:        aws.StringSlice(input.subnets),
+				SecurityGroups: aws.StringSlice(input.securityGroups),
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("run task(s) with group name %s: %w", input.taskFamilyName, err)
+	}
+	return nil
 }
 
 // TaskStatus returns the status of the running task.

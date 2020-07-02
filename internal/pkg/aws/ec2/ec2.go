@@ -102,8 +102,8 @@ func (c *EC2) getSubnetIDs(filters []*ec2.Filter) ([]string, error) {
 	}
 
 	subnetIDs := make([]string, len(response.Subnets))
-	for _, subnet := range response.Subnets {
-		subnetIDs = append(subnetIDs, aws.StringValue(subnet.SubnetId))
+	for idx, subnet := range response.Subnets {
+		subnetIDs[idx] = aws.StringValue(subnet.SubnetId)
 	}
 	return subnetIDs, nil
 }

@@ -7,11 +7,17 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/aws/copilot-cli/internal/pkg/deploy/cloudformation/stack"
+
+	"github.com/aws/copilot-cli/internal/pkg/aws/resourcegroups"
+
+	"github.com/aws/aws-sdk-go/aws"
+	awsecs "github.com/aws/aws-sdk-go/service/ecs"
+
 	"github.com/aws/copilot-cli/internal/pkg/aws/ecr"
 
 	awscfn "github.com/aws/copilot-cli/internal/pkg/aws/cloudformation"
 
-	"github.com/aws/copilot-cli/internal/pkg/aws/ecs"
 	"github.com/aws/copilot-cli/internal/pkg/deploy"
 
 	"github.com/aws/copilot-cli/internal/pkg/aws/ec2"
@@ -39,12 +45,17 @@ var (
 		"Select %s to run the task in your default VPC instead of any existing environment.", color.Emphasize(config.EnvNameNone))
 	taskRunGroupNamePromptHelp = "The group name of the task. Tasks with the same group name share the same set of resources, including CloudFormation stack, CloudWatch log group, task definition and ECR repository."
 
-	fmtImageURL = "%s:%s"
-	fmtRepoName = "copilot-%s"
+	fmtTaskFamilyName = "copilot-%s"
+	fmtRepoName       = "copilot-%s"
+	fmtImageURL       = "%s:%s"
 )
 
-const defaultImageTag = "latest"
-const defaultDockerfilePath = "./Dockerfile"
+const (
+	defaultImageTag       = "latest"
+	defaultDockerfilePath = "./Dockerfile"
+	clusterResourceType   = "AWS::ECS::Cluster"
+	runTaskStartedBy      = "copilot-task"
+)
 
 type runTaskVars struct {
 	*GlobalOpts
@@ -81,7 +92,9 @@ type runTaskOpts struct {
 	ecrGetter ecrService
 	vpcGetter vpcService
 	deployer  taskResourceDeployer
-	ecs       *ecs.ECS
+	ecs       *awsecs.ECS
+
+	resourceGetter resourceGroupsClient
 }
 
 func newTaskRunOpts(vars runTaskVars) (*runTaskOpts, error) {
@@ -99,9 +112,11 @@ func newTaskRunOpts(vars runTaskVars) (*runTaskOpts, error) {
 		sel:       selector.NewSelect(vars.prompt, store),
 		docker:    docker.New(),
 		vpcGetter: ec2.New(sess),
-		ecs:       ecs.New(sess),
+		ecs:       awsecs.New(sess),
 		ecrGetter: ecr.New(sess),
 		deployer:  cloudformation.New(sess),
+
+		resourceGetter: resourcegroups.New(sess),
 	}, nil
 }
 
@@ -179,6 +194,11 @@ func (o *runTaskOpts) Execute() error {
 		return err
 	}
 
+	cluster, err := o.getCluster()
+	if err != nil {
+		return err
+	}
+
 	if err := o.createAndUpdateTaskResources(); err != nil {
 		return err
 	}
@@ -197,7 +217,53 @@ func (o *runTaskOpts) Execute() error {
 		}
 	}
 
-	// TODO: kick off task
+	return o.runTask(cluster)
+}
+
+func (o *runTaskOpts) getCluster() (string, error) {
+	if o.env == config.EnvNameNone {
+		resp, err := o.ecs.DescribeClusters(&awsecs.DescribeClustersInput{})
+		if err != nil {
+			return "", fmt.Errorf("get default cluster: %w", err)
+		}
+
+		clusters := make([]string, len(resp.Clusters))
+		for idx, cluster := range resp.Clusters {
+			clusters[idx] = aws.StringValue(cluster.ClusterArn)
+		}
+		return clusters[0], nil
+	}
+
+	resources, err := o.resourceGetter.GetResourcesByTags(clusterResourceType, map[string]string{
+		stack.AppTagKey: o.AppName(),
+		stack.EnvTagKey: o.env,
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("get cluster: %w", err)
+	}
+
+	return resources[0], nil
+}
+
+func (o *runTaskOpts) runTask(cluster string) error {
+	_, err := o.ecs.RunTask(&awsecs.RunTaskInput{
+		Cluster:        aws.String(cluster),
+		Count:          aws.Int64(o.count),
+		LaunchType:     aws.String(awsecs.LaunchTypeFargate),
+		StartedBy:      aws.String(runTaskStartedBy),
+		TaskDefinition: aws.String(fmt.Sprintf(fmtTaskFamilyName, o.groupName)),
+		NetworkConfiguration: &awsecs.NetworkConfiguration{
+			AwsvpcConfiguration: &awsecs.AwsVpcConfiguration{
+				AssignPublicIp: aws.String(awsecs.AssignPublicIpEnabled),
+				Subnets:        aws.StringSlice(o.subnets),
+			},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("run task %s: %w", o.groupName, err)
+	}
+
 	return nil
 }
 
@@ -227,6 +293,7 @@ func (o *runTaskOpts) getNetworkConfig() error {
 		}
 		o.subnets = subnetIDs
 	}
+
 	return nil
 }
 
