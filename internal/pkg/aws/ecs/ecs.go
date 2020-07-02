@@ -30,6 +30,7 @@ type api interface {
 	ListTasks(input *ecs.ListTasksInput) (*ecs.ListTasksOutput, error)
 	DescribeClusters(input *ecs.DescribeClustersInput) (*ecs.DescribeClustersOutput, error)
 	RunTask(input *ecs.RunTaskInput) (*ecs.RunTaskOutput, error)
+	WaitUntilTasksRunning(input *ecs.DescribeTasksInput) error
 }
 
 // ECS wraps an AWS ECS client.
@@ -193,9 +194,10 @@ func (e *ECS) DefaultClusters() ([]string, error) {
 	return clusters, nil
 }
 
-// RunTask runs a number of tasks with the task definition and network configurations in a cluster
+// RunTask runs a number of tasks with the task definition and network configurations in a cluster, and returns after
+// the task(s) is running or fails to run
 func (e *ECS) RunTask(input RunTaskInput) error {
-	_, err := e.client.RunTask(&ecs.RunTaskInput{
+	resp, err := e.client.RunTask(&ecs.RunTaskInput{
 		Cluster:        aws.String(input.Cluster),
 		Count:          aws.Int64(input.Count),
 		LaunchType:     aws.String(ecs.LaunchTypeFargate),
@@ -211,6 +213,18 @@ func (e *ECS) RunTask(input RunTaskInput) error {
 	})
 	if err != nil {
 		return fmt.Errorf("run task(s) with group name %s: %w", input.TaskFamilyName, err)
+	}
+
+	taskArns := make([]string, len(resp.Tasks))
+	for idx, task := range resp.Tasks {
+		taskArns[idx] = aws.StringValue(task.TaskArn)
+	}
+
+	if err := e.client.WaitUntilTasksRunning(&ecs.DescribeTasksInput{
+		Cluster: aws.String(input.Cluster),
+		Tasks:   aws.StringSlice(taskArns),
+	}); err != nil {
+		return fmt.Errorf("wait for tasks to be running: %w", err)
 	}
 	return nil
 }

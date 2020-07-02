@@ -239,6 +239,7 @@ func (o *runTaskOpts) getCluster() (string, error) {
 }
 
 func (o *runTaskOpts) runTask(cluster string) error {
+	o.spinner.Start(fmt.Sprintf("Waiting for %s to be running.", o.groupName))
 	err := o.starter.RunTask(ecs.RunTaskInput{
 		Cluster:        cluster,
 		Count:          o.count,
@@ -248,11 +249,11 @@ func (o *runTaskOpts) runTask(cluster string) error {
 	})
 
 	if err != nil {
+		o.spinner.Stop(log.Serrorln(fmt.Sprintf("Failed to run %s", o.groupName)))
 		return fmt.Errorf("run task %s: %w", o.groupName, err)
 	}
 
-	// TODO: waitUntilTasksRunning
-	log.Successln(fmt.Sprintf("Task %s is running", o.groupName))
+	o.spinner.Stop(log.Ssuccessln(fmt.Sprintf("Task(s) %s is running.", o.groupName)))
 	return nil
 }
 

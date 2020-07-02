@@ -1195,21 +1195,6 @@ func (m *MockvpcService) EXPECT() *MockvpcServiceMockRecorder {
 	return m.recorder
 }
 
-// GetDefaultSubnetIDs mocks base method
-func (m *MockvpcService) GetDefaultSubnetIDs() ([]string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetDefaultSubnetIDs")
-	ret0, _ := ret[0].([]string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetDefaultSubnetIDs indicates an expected call of GetDefaultSubnetIDs
-func (mr *MockvpcServiceMockRecorder) GetDefaultSubnetIDs() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDefaultSubnetIDs", reflect.TypeOf((*MockvpcService)(nil).GetDefaultSubnetIDs))
-}
-
 // GetSubnetIDs mocks base method
 func (m *MockvpcService) GetSubnetIDs(app, env string) ([]string, error) {
 	m.ctrl.T.Helper()
@@ -1296,6 +1281,44 @@ func (m *MockcwlogService) LogGroupExists(logGroupName string) (bool, error) {
 func (mr *MockcwlogServiceMockRecorder) LogGroupExists(logGroupName interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LogGroupExists", reflect.TypeOf((*MockcwlogService)(nil).LogGroupExists), logGroupName)
+}
+
+// MockecsService is a mock of ecsService interface
+type MockecsService struct {
+	ctrl     *gomock.Controller
+	recorder *MockecsServiceMockRecorder
+}
+
+// MockecsServiceMockRecorder is the mock recorder for MockecsService
+type MockecsServiceMockRecorder struct {
+	mock *MockecsService
+}
+
+// NewMockecsService creates a new mock instance
+func NewMockecsService(ctrl *gomock.Controller) *MockecsService {
+	mock := &MockecsService{ctrl: ctrl}
+	mock.recorder = &MockecsServiceMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MockecsService) EXPECT() *MockecsServiceMockRecorder {
+	return m.recorder
+}
+
+// DefaultClusters mocks base method
+func (m *MockecsService) DefaultClusters() ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DefaultClusters")
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DefaultClusters indicates an expected call of DefaultClusters
+func (mr *MockecsServiceMockRecorder) DefaultClusters() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DefaultClusters", reflect.TypeOf((*MockecsService)(nil).DefaultClusters))
 }
 
 // Mocktemplater is a mock of templater interface
@@ -2412,6 +2435,43 @@ func (m *MocktaskResourceDeployer) DeployTask(input *deploy.CreateTaskResourcesI
 func (mr *MocktaskResourceDeployerMockRecorder) DeployTask(input interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeployTask", reflect.TypeOf((*MocktaskResourceDeployer)(nil).DeployTask), input)
+}
+
+// MocktaskStarter is a mock of taskStarter interface
+type MocktaskStarter struct {
+	ctrl     *gomock.Controller
+	recorder *MocktaskStarterMockRecorder
+}
+
+// MocktaskStarterMockRecorder is the mock recorder for MocktaskStarter
+type MocktaskStarterMockRecorder struct {
+	mock *MocktaskStarter
+}
+
+// NewMocktaskStarter creates a new mock instance
+func NewMocktaskStarter(ctrl *gomock.Controller) *MocktaskStarter {
+	mock := &MocktaskStarter{ctrl: ctrl}
+	mock.recorder = &MocktaskStarterMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MocktaskStarter) EXPECT() *MocktaskStarterMockRecorder {
+	return m.recorder
+}
+
+// RunTask mocks base method
+func (m *MocktaskStarter) RunTask(input ecs.RunTaskInput) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RunTask", input)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RunTask indicates an expected call of RunTask
+func (mr *MocktaskStarterMockRecorder) RunTask(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunTask", reflect.TypeOf((*MocktaskStarter)(nil).RunTask), input)
 }
 
 // MocksvcDeleter is a mock of svcDeleter interface

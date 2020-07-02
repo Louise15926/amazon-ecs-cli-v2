@@ -122,3 +122,17 @@ func (mr *MockapiMockRecorder) RunTask(input interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunTask", reflect.TypeOf((*Mockapi)(nil).RunTask), input)
 }
+
+// WaitUntilTasksRunning mocks base method
+func (m *Mockapi) WaitUntilTasksRunning(input *ecs.DescribeTasksInput) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitUntilTasksRunning", input)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitUntilTasksRunning indicates an expected call of WaitUntilTasksRunning
+func (mr *MockapiMockRecorder) WaitUntilTasksRunning(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitUntilTasksRunning", reflect.TypeOf((*Mockapi)(nil).WaitUntilTasksRunning), input)
+}

@@ -427,7 +427,23 @@ func TestECS_RunTask(t *testing.T) {
 						},
 					},
 				}).
-					Return(&ecs.RunTaskOutput{}, nil)
+					Return(&ecs.RunTaskOutput{
+						Tasks: []*ecs.Task{
+							&ecs.Task{
+								TaskArn: aws.String("task-1"),
+							},
+							&ecs.Task{
+								TaskArn: aws.String("task-2"),
+							},
+							&ecs.Task{
+								TaskArn: aws.String("task-3"),
+							},
+						},
+				}, nil)
+				m.EXPECT().WaitUntilTasksRunning(&ecs.DescribeTasksInput{
+					Cluster: aws.String("my-cluster"),
+					Tasks: aws.StringSlice([]string{"task-1", "task-2", "task-3"}),
+				}).Times(1)
 			},
 		},
 		"run task failed": {
@@ -449,6 +465,7 @@ func TestECS_RunTask(t *testing.T) {
 					},
 				}).
 					Return(&ecs.RunTaskOutput{}, errors.New("error"))
+				m.EXPECT().WaitUntilTasksRunning(gomock.Any()).Times(0)
 			},
 			wantedError: errors.New("run task(s) with group name my-task: error"),
 		},
