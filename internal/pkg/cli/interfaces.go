@@ -134,7 +134,6 @@ type ecrService interface {
 }
 
 type vpcService interface {
-	GetDefaultSubnetIDs() ([]string, error)
 	GetSubnetIDs(app string, env string) ([]string, error)
 	GetSecurityGroups(app string, env string) ([]string, error)
 }

@@ -8,6 +8,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/aws/copilot-cli/internal/pkg/aws/resourcegroups"
+
+	awsecs "github.com/aws/aws-sdk-go/service/ecs"
+
+	"github.com/aws/copilot-cli/internal/pkg/aws/ec2"
+	"github.com/aws/copilot-cli/internal/pkg/aws/session"
+	"github.com/aws/copilot-cli/internal/pkg/term/log"
+
 	"github.com/aws/copilot-cli/internal/pkg/aws/ecr"
 
 	"github.com/aws/copilot-cli/internal/pkg/cli/mocks"
@@ -413,7 +421,7 @@ func TestTaskRunOpts_Ask(t *testing.T) {
 	}
 }
 
-func TestTaskRunOpts_getEnvironment(t *testing.T) {
+func TestTaskRunOpts_getNetworkConfig(t *testing.T) {
 	testCases := map[string]struct {
 		inSubnets        []string
 		inSecurityGroups []string
@@ -427,14 +435,51 @@ func TestTaskRunOpts_getEnvironment(t *testing.T) {
 		wantedSubnets        []string
 		wantedSecurityGroups []string
 	}{
-		"should get default subnet": {
-			env: config.EnvNameNone,
+		"don't get default subnet IDs if they are provided": {
+			env:       config.EnvNameNone,
+			inSubnets: []string{"subnet-1", "subnet-3"},
+
 			mockVPC: func(m *mocks.MockvpcService) {
-				m.EXPECT().GetDefaultSubnetIDs().Return([]string{"subnet-1", "subnet-2"}, nil).Times(1)
+				m.EXPECT().GetSubnetIDs(gomock.Any(), gomock.Any()).Times(0)
+				m.EXPECT().GetSecurityGroups(gomock.Any(), gomock.Any()).AnyTimes()
 			},
-			wantedSubnets: []string{"subnet-1", "subnet-2"},
+
+			wantedSubnets: []string{"subnet-1", "subnet-3"},
 		},
-		"should get subnets and security-groups from app env": {
+		"don't get default security groups if they are provided": {
+			env:              config.EnvNameNone,
+			inSecurityGroups: []string{"sg-1", "sg-3"},
+
+			mockVPC: func(m *mocks.MockvpcService) {
+				m.EXPECT().GetSubnetIDs(gomock.Any(), gomock.Any()).AnyTimes()
+				m.EXPECT().GetSecurityGroups(gomock.Any(), gomock.Any()).Times(0)
+			},
+
+			wantedSecurityGroups: []string{"sg-1", "sg-3"},
+		},
+		"error getting subnets from app env": {
+			appName: "my-app",
+			env:     "test",
+
+			mockVPC: func(m *mocks.MockvpcService) {
+				m.EXPECT().GetSubnetIDs("my-app", "test").Return(nil, errors.New("error")).Times(1)
+				m.EXPECT().GetSecurityGroups(gomock.Any(), gomock.Any()).AnyTimes()
+			},
+
+			wantedError: errors.New("get subnet IDs from environment test: error"),
+		},
+		"error getting security groups from app env": {
+			appName: "my-app",
+			env:     "test",
+
+			mockVPC: func(m *mocks.MockvpcService) {
+				m.EXPECT().GetSubnetIDs(gomock.Any(), gomock.Any()).AnyTimes()
+				m.EXPECT().GetSecurityGroups("my-app", "test").Return(nil, errors.New("error")).Times(1)
+			},
+
+			wantedError: errors.New("get security groups from environment test: error"),
+		},
+		"get subnets and security-groups from app env": {
 			appName: "my-app",
 			env:     "test",
 
@@ -445,47 +490,6 @@ func TestTaskRunOpts_getEnvironment(t *testing.T) {
 
 			wantedSubnets:        []string{"subnet-3", "subnet-4"},
 			wantedSecurityGroups: []string{"sg-3", "sg-4"},
-		},
-		"don't get default subnet-id if it is provided": {
-			env:       config.EnvNameNone,
-			inSubnets: []string{"subnet-1", "subnet-3"},
-
-			mockVPC: func(m *mocks.MockvpcService) {
-				m.EXPECT().GetDefaultSubnetIDs().Times(0)
-			},
-
-			wantedSubnets: []string{"subnet-1", "subnet-3"},
-		},
-		"error getting subnets from app env": {
-			appName: "my-app",
-			env:     "test",
-
-			mockVPC: func(m *mocks.MockvpcService) {
-				m.EXPECT().GetSubnetIDs("my-app", "test").Return(nil, errors.New("error")).Times(1)
-			},
-
-			wantedError: errors.New("get subnet IDs: error"),
-		},
-		"error getting security groups from app env": {
-			appName:   "my-app",
-			env:       "test",
-			inSubnets: []string{"subnet-1"},
-
-			mockVPC: func(m *mocks.MockvpcService) {
-				m.EXPECT().GetSubnetIDs("my-app", "test").Return(nil, nil).Times(1)
-				m.EXPECT().GetSecurityGroups("my-app", "test").Return(nil, errors.New("error")).Times(1)
-			},
-
-			wantedError: errors.New("get security groups: error"),
-		},
-		"error getting default subnet": {
-			env: config.EnvNameNone,
-
-			mockVPC: func(m *mocks.MockvpcService) {
-				m.EXPECT().GetDefaultSubnetIDs().Return(nil, errors.New("error")).Times(1)
-			},
-
-			wantedError: errors.New("get subnet IDs: error"),
 		},
 	}
 
@@ -594,4 +598,72 @@ func TestTaskRunOpts_pushToECRRepo(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTaskRunOpts_runTask(t *testing.T) {
+	sess, err := session.NewProvider().Default()
+	if err != nil {
+		log.Errorf("error getting session: %w", sess)
+		return
+	}
+
+	t.Run("run task test", func(t *testing.T) {
+		opts := runTaskOpts{
+			runTaskVars: runTaskVars{
+				GlobalOpts: &GlobalOpts{
+					appName: "expr-exec",
+				},
+				count:     1,
+				groupName: "task-expr",
+				env:       "test",
+			},
+			vpcGetter: ec2.New(sess),
+			ecs:       awsecs.New(sess),
+		}
+
+		err := opts.getNetworkConfig()
+		if err != nil {
+			log.Errorf("error getting network config: %w", err)
+			return
+		}
+
+		err = opts.runTask("defaultCluster")
+		if err != nil {
+			log.Errorf("error running task: %w", err)
+		}
+		log.Info("629")
+	})
+}
+
+func TestTaskRunOpts_getCluster(t *testing.T) {
+	sess, err := session.NewProvider().Default()
+	if err != nil {
+		log.Errorf("error getting session: %w", sess)
+		return
+	}
+
+	t.Run("run task test", func(t *testing.T) {
+		opts := runTaskOpts{
+			runTaskVars: runTaskVars{
+				GlobalOpts: &GlobalOpts{
+					appName: "expr-exec",
+				},
+				count:     1,
+				groupName: "task-expr",
+				env:       "test",
+			},
+			vpcGetter:      ec2.New(sess),
+			ecs:            awsecs.New(sess),
+			resourceGetter: resourcegroups.New(sess),
+		}
+
+		resources, err := opts.getCluster()
+		if err != nil {
+			log.Errorf("error running task: %w", err)
+		}
+		for _, cluster := range resources {
+			log.Infoln(cluster)
+		}
+		//log.Infoln(resources)
+	})
 }

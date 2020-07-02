@@ -268,32 +268,21 @@ func (o *runTaskOpts) runTask(cluster string) error {
 }
 
 func (o *runTaskOpts) getNetworkConfig() error {
-	if o.env != config.EnvNameNone {
+	if o.subnets == nil {
 		subnets, err := o.vpcGetter.GetSubnetIDs(o.AppName(), o.env)
 		if err != nil {
-			return fmt.Errorf("get subnet IDs: %w", err)
+			return fmt.Errorf("get subnet IDs from environment %s: %w", o.env, err)
 		}
+		o.subnets = subnets
+	}
 
+	if o.securityGroups == nil {
 		securityGroups, err := o.vpcGetter.GetSecurityGroups(o.AppName(), o.env)
 		if err != nil {
-			return fmt.Errorf("get security groups: %w", err)
+			return fmt.Errorf("get security groups from environment %s: %w", o.env, err)
 		}
-
-		o.subnets = subnets
 		o.securityGroups = securityGroups
-
-		return nil
 	}
-
-	// get default subnet IDs if not provided
-	if o.subnets == nil {
-		subnetIDs, err := o.vpcGetter.GetDefaultSubnetIDs()
-		if err != nil {
-			return fmt.Errorf("get subnet IDs: %w", err)
-		}
-		o.subnets = subnetIDs
-	}
-
 	return nil
 }
 
