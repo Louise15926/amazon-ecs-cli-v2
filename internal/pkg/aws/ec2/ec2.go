@@ -1,3 +1,7 @@
+// Copyright Amazon.com Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+// Package ec2 provides a client to make API requests to Amazon Elastic Compute Cloud.
 package ec2
 
 import (
@@ -59,11 +63,11 @@ func (c *EC2) GetSubnetIDs(app string, env string) ([]string, error) {
 	return c.getSubnetIDs(filters)
 }
 
-// GetDefaultSubnetIDs finds the security group IDs associated with the environment of the application; if env is a
-// None env, it finds the default subnet IDs.
+// GetDefaultSubnetIDs finds the security group IDs associated with the environment of the application;
+// if env is a None env, it returns nil
 func (c *EC2) GetSecurityGroups(app string, env string) ([]string, error) {
 	if env == config.EnvNameNone {
-		return c.getDefaultSecurityGroupIDs()
+		return nil, nil
 	}
 
 	filters := []*ec2.Filter{
@@ -102,10 +106,6 @@ func (c *EC2) getSubnetIDs(filters []*ec2.Filter) ([]string, error) {
 		subnetIDs[idx] = aws.StringValue(subnet.SubnetId)
 	}
 	return subnetIDs, nil
-}
-
-func (c *EC2) getDefaultSecurityGroupIDs() ([]string, error) {
-	return c.getSecurityGroups([]*ec2.Filter{&defaultFilter})
 }
 
 func (c *EC2) getSecurityGroups(filters []*ec2.Filter) ([]string, error) {

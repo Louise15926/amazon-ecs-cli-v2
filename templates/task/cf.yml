@@ -23,15 +23,18 @@ Conditions:
     !Not [!Equals [!Ref ContainerImage, ""]]
   UseDefaultTaskRole:
     !Equals [!Ref TaskRole, ""]
+  HasCommand:
+    !Not [!Equals [!Ref Command, ""]]
 Resources:
   TaskDefinition:
+    Condition: HasImage
     Type: AWS::ECS::TaskDefinition
     DependsOn: ECRRepo
     Properties:
       ContainerDefinitions:
         -
-          Image: !If [HasImage, !Ref ContainerImage, "AWS::NoValue"]
-          Command: !Split [" ", !Ref Command]
+          Image: !Ref ContainerImage
+          Command: !If [HasCommand, !Split [" ", !Ref Command], !Ref "AWS::NoValue"]
           LogConfiguration:
             LogDriver: awslogs
             Options:

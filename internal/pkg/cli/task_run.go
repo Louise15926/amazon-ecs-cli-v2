@@ -45,7 +45,7 @@ var (
 )
 
 const (
-	defaultImageTag       = "latest"
+	defaultImageTag       = "copilot"
 	defaultDockerfilePath = "./Dockerfile"
 	clusterResourceType   = "AWS::ECS::Cluster"
 )
@@ -266,6 +266,8 @@ func (o *runTaskOpts) getNetworkConfig() error {
 		o.subnets = subnets
 	}
 
+	// if the task is to be run in None environment (default environment), leave security groups as nil since it is not
+	// a required field for run task
 	if o.securityGroups == nil {
 		securityGroups, err := o.vpcGetter.GetSecurityGroups(o.AppName(), o.env)
 		if err != nil {

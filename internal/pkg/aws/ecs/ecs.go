@@ -5,6 +5,7 @@
 package ecs
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -187,10 +188,15 @@ func (e *ECS) DefaultClusters() ([]string, error) {
 		return nil, fmt.Errorf("get default clusters: %w", err)
 	}
 
+	if len(resp.Clusters) == 0 {
+		return nil, errors.New("no default cluster is found")
+	}
+
 	clusters := make([]string, len(resp.Clusters))
 	for idx, cluster := range resp.Clusters {
 		clusters[idx] = aws.StringValue(cluster.ClusterArn)
 	}
+
 	return clusters, nil
 }
 
